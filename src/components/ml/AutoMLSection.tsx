@@ -41,6 +41,21 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
     );
   }
 
+  // Filter out ID columns and other non-predictive columns
+  const getFeatureColumns = (columns: string[], targetColumn: string) => {
+    return columns.filter(col => {
+      const colLower = col.toLowerCase();
+      return col !== targetColumn && 
+             !colLower.includes('id') && 
+             !colLower.includes('index') &&
+             !colLower.includes('row') &&
+             !colLower.includes('key') &&
+             col !== 'id' &&
+             col !== 'ID' &&
+             col !== 'Id';
+    });
+  };
+
   const handleTrainModel = async () => {
     if (!selectedTarget || !selectedTask) {
       toast({
@@ -54,6 +69,19 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
     setIsTraining(true);
     console.log("Training model with:", { selectedTarget, selectedTask });
 
+    // Get feature columns (excluding ID columns and target)
+    const featureColumns = getFeatureColumns(data.columns, selectedTarget);
+    
+    if (featureColumns.length === 0) {
+      toast({
+        title: "No Valid Features",
+        description: "No suitable feature columns found for training. Please ensure your data has predictive features beyond ID columns.",
+        variant: "destructive",
+      });
+      setIsTraining(false);
+      return;
+    }
+
     // Simulate ML model training
     setTimeout(() => {
       const mockResults = {
@@ -62,12 +90,11 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
         r2Score: selectedTask === "regression" ? 0.87 : null,
         mse: selectedTask === "regression" ? 0.15 : null,
         crossValidationScore: 0.91,
-        featureImportance: [
-          { feature: data.columns.filter((col: string) => col !== selectedTarget)[0] || "Feature1", importance: 0.35 },
-          { feature: data.columns.filter((col: string) => col !== selectedTarget)[1] || "Feature2", importance: 0.28 },
-          { feature: data.columns.filter((col: string) => col !== selectedTarget)[2] || "Feature3", importance: 0.22 },
-          { feature: data.columns.filter((col: string) => col !== selectedTarget)[3] || "Feature4", importance: 0.15 },
-        ].filter(item => item.feature !== selectedTarget),
+        // Only include actual feature columns, not ID columns
+        featureImportance: featureColumns.slice(0, 4).map((col, index) => ({
+          feature: col,
+          importance: [0.35, 0.28, 0.22, 0.15][index] || 0.1
+        })),
         confusionMatrix: selectedTask === "classification" ? [
           [45, 3],
           [2, 50]
@@ -96,14 +123,15 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
           actual: Math.random() * 100,
           predicted: Math.random() * 100,
           residual: (Math.random() - 0.5) * 20
-        }))
+        })),
+        usedFeatures: featureColumns // Track which features were actually used
       };
 
       setModelResults(mockResults);
       setShowInsights(true);
       toast({
         title: "Model Training Complete",
-        description: `Best model: ${mockResults.bestModel} with ${(mockResults.crossValidationScore * 100).toFixed(1)}% CV score`,
+        description: `Best model: ${mockResults.bestModel} with ${(mockResults.crossValidationScore * 100).toFixed(1)}% CV score using ${featureColumns.length} features`,
       });
       setIsTraining(false);
     }, 3000);
@@ -120,6 +148,9 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
   ];
 
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'];
+
+  // Get available feature columns for display
+  const availableFeatures = selectedTarget ? getFeatureColumns(data.columns, selectedTarget) : [];
 
   return (
     <>
@@ -149,6 +180,14 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedTarget && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {availableFeatures.length} feature columns available for training
+                  {availableFeatures.length === 0 && (
+                    <span className="text-red-400 block">⚠️ No valid features found. Ensure your data has predictive columns beyond ID fields.</span>
+                  )}
+                </p>
+              )}
             </div>
 
             <div>
@@ -170,8 +209,8 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
 
             <Button
               onClick={handleTrainModel}
-              disabled={isTraining}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              disabled={isTraining || availableFeatures.length === 0}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
             >
               {isTraining ? (
                 <>
@@ -211,6 +250,24 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                 </div>
               </div>
             </div>
+
+            {selectedTarget && availableFeatures.length > 0 && (
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <h4 className="text-sm text-white font-medium mb-2">Features to be used:</h4>
+                <div className="flex flex-wrap gap-1">
+                  {availableFeatures.slice(0, 6).map((feature) => (
+                    <Badge key={feature} variant="outline" className="text-xs border-slate-500 text-slate-300">
+                      {feature}
+                    </Badge>
+                  ))}
+                  {availableFeatures.length > 6 && (
+                    <Badge variant="outline" className="text-xs border-slate-500 text-slate-300">
+                      +{availableFeatures.length - 6} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
