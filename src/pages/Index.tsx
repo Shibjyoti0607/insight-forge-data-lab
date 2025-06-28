@@ -47,14 +47,9 @@ const Index = () => {
         .from('user_data')
         .select('uploaded_data, cleaned_data')
         .eq('id', userIdToFetch)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No data found - this is normal for new users
-          console.log("No existing data found for user");
-          return;
-        }
         throw error;
       }
 
@@ -73,6 +68,9 @@ const Index = () => {
         if (data.uploaded_data) {
           setActiveTab("preview");
         }
+      } else {
+        // No data found - this is normal for new users
+        console.log("No existing data found for user");
       }
     } catch (error: any) {
       console.error("Error fetching user data:", error);
