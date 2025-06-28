@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Lock, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import OTPPhoneSection from "./OTPPhoneSection";
+import OTPEmailSection from "./OTPEmailSection";
 
 interface AuthSectionProps {
   onAuthSuccess: () => void;
@@ -15,7 +18,6 @@ interface AuthSectionProps {
 const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -23,51 +25,74 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return;
+
     setIsLoading(true);
-    
     console.log("Email login attempted:", email);
     
-    // Simulate authentication delay
-    setTimeout(() => {
-      if (email && password) {
-        toast({
-          title: "Login Successful",
-          description: "Welcome to AI DataLab!",
-        });
-        onAuthSuccess();
-      } else {
-        toast({
-          title: "Login Failed",
-          description: "Please enter valid credentials.",
-          variant: "destructive",
-        });
-      }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Login Successful",
+        description: "Welcome to AI DataLab!",
+      });
+      onAuthSuccess();
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login Failed",
+        description: error.message || "Please check your credentials and try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleOTPLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignUp = async () => {
+    if (!email || !password) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    
-    console.log("OTP login attempted:", otp);
-    
-    setTimeout(() => {
-      if (otp.length === 6) {
-        toast({
-          title: "OTP Verified",
-          description: "Login successful!",
-        });
-        onAuthSuccess();
-      } else {
-        toast({
-          title: "Invalid OTP",
-          description: "Please enter a valid 6-digit code.",
-          variant: "destructive",
-        });
-      }
+    console.log("Sign up attempted:", email);
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Account Created",
+        description: "Please check your email to verify your account.",
+      });
+    } catch (error: any) {
+      console.error("Sign up error:", error);
+      toast({
+        title: "Sign Up Failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -81,14 +106,18 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="email" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-700">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-700">
               <TabsTrigger value="email" className="data-[state=active]:bg-purple-600">
                 <Mail className="h-4 w-4 mr-2" />
                 Email
               </TabsTrigger>
-              <TabsTrigger value="otp" className="data-[state=active]:bg-purple-600">
+              <TabsTrigger value="phone" className="data-[state=active]:bg-purple-600">
                 <Smartphone className="h-4 w-4 mr-2" />
-                OTP
+                Phone
+              </TabsTrigger>
+              <TabsTrigger value="email-otp" className="data-[state=active]:bg-purple-600">
+                <Mail className="h-4 w-4 mr-2" />
+                Email OTP
               </TabsTrigger>
             </TabsList>
 
@@ -125,32 +154,24 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
                 >
                   {isLoading ? "Signing In..." : "Sign In"}
                 </Button>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="w-full border-slate-600 text-gray-300 hover:bg-slate-700"
+                  onClick={handleSignUp}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Creating Account..." : "Create Account"}
+                </Button>
               </form>
             </TabsContent>
 
-            <TabsContent value="otp">
-              <form onSubmit={handleOTPLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="otp" className="text-gray-300">Enter 6-digit OTP</Label>
-                  <Input
-                    id="otp"
-                    type="text"
-                    placeholder="123456"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    className="bg-slate-700 border-slate-600 text-white placeholder:text-gray-400 text-center text-lg tracking-widest"
-                    maxLength={6}
-                    required
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Verifying..." : "Verify OTP"}
-                </Button>
-              </form>
+            <TabsContent value="phone">
+              <OTPPhoneSection onAuthSuccess={onAuthSuccess} />
+            </TabsContent>
+
+            <TabsContent value="email-otp">
+              <OTPEmailSection onAuthSuccess={onAuthSuccess} />
             </TabsContent>
           </Tabs>
         </CardContent>
