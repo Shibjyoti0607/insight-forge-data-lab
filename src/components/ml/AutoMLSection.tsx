@@ -44,18 +44,47 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
     );
   }
 
-  // Filter out ID columns and other non-predictive columns
+  // Enhanced feature column filtering - exclude ID columns and other non-predictive columns
   const getFeatureColumns = (columns: string[], targetColumn: string) => {
     return columns.filter(col => {
       const colLower = col.toLowerCase();
-      return col !== targetColumn && 
-             !colLower.includes('id') && 
-             !colLower.includes('index') &&
-             !colLower.includes('row') &&
-             !colLower.includes('key') &&
-             col !== 'id' &&
-             col !== 'ID' &&
-             col !== 'Id';
+      const colOriginal = col;
+      
+      // Skip if it's the target column
+      if (col === targetColumn) return false;
+      
+      // Skip obvious ID columns
+      if (colLower.includes('id') || 
+          colLower.includes('index') ||
+          colLower.includes('row') ||
+          colLower.includes('key') ||
+          col === 'id' ||
+          col === 'ID' ||
+          col === 'Id') return false;
+      
+      // Skip customer/user identifier columns
+      if (colLower.includes('customer') && (colLower.includes('name') || colLower.includes('id'))) return false;
+      if (colLower.includes('user') && (colLower.includes('name') || colLower.includes('id'))) return false;
+      if (colLower.includes('client') && (colLower.includes('name') || colLower.includes('id'))) return false;
+      
+      // Skip other name-based columns that are typically non-predictive
+      if (colLower.includes('name') && !colLower.includes('product') && !colLower.includes('category')) return false;
+      if (colLower.includes('email')) return false;
+      if (colLower.includes('phone')) return false;
+      if (colLower.includes('address')) return false;
+      
+      // Skip timestamp columns that are just record keeping
+      if (colLower.includes('created') && colLower.includes('at')) return false;
+      if (colLower.includes('updated') && colLower.includes('at')) return false;
+      if (colLower.includes('timestamp') && !colLower.includes('event')) return false;
+      
+      // Skip other common non-predictive columns
+      if (colLower.includes('uuid')) return false;
+      if (colLower.includes('guid')) return false;
+      if (colLower.includes('hash')) return false;
+      if (colLower.includes('token')) return false;
+      
+      return true;
     });
   };
 
@@ -78,7 +107,17 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
     if (featureColumns.length === 0) {
       toast({
         title: "No Valid Features",
-        description: "No suitable feature columns found for training. Please ensure your data has predictive features beyond ID columns.",
+        description: "No suitable feature columns found for training. Please ensure your data has predictive features beyond ID columns and customer identifiers.",
+        variant: "destructive",
+      });
+      setAutoMLState(prev => ({ ...prev, isTraining: false }));
+      return;
+    }
+
+    if (featureColumns.length < 2) {
+      toast({
+        title: "Insufficient Features",
+        description: `Only ${featureColumns.length} valid feature column found. Machine learning models typically need at least 2-3 features for reliable predictions.`,
         variant: "destructive",
       });
       setAutoMLState(prev => ({ ...prev, isTraining: false }));
@@ -94,9 +133,9 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
         mse: autoMLState.selectedTask === "regression" ? 0.15 : null,
         crossValidationScore: 0.91,
         // Only include actual feature columns, not ID columns
-        featureImportance: featureColumns.slice(0, 4).map((col, index) => ({
+        featureImportance: featureColumns.slice(0, Math.min(6, featureColumns.length)).map((col, index) => ({
           feature: col,
-          importance: [0.35, 0.28, 0.22, 0.15][index] || 0.1
+          importance: [0.35, 0.28, 0.22, 0.15, 0.12, 0.08][index] || 0.05
         })),
         confusionMatrix: autoMLState.selectedTask === "classification" ? [
           [45, 3],
@@ -127,7 +166,8 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
           predicted: Math.random() * 100,
           residual: (Math.random() - 0.5) * 20
         })),
-        usedFeatures: featureColumns // Track which features were actually used
+        usedFeatures: featureColumns, // Track which features were actually used
+        excludedColumns: data.columns.filter((col: string) => !featureColumns.includes(col) && col !== autoMLState.selectedTarget)
       };
 
       setAutoMLState(prev => ({
@@ -158,6 +198,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
 
   // Get available feature columns for display
   const availableFeatures = autoMLState.selectedTarget ? getFeatureColumns(data.columns, autoMLState.selectedTarget) : [];
+  const excludedColumns = autoMLState.selectedTarget ? data.columns.filter((col: string) => !availableFeatures.includes(col) && col !== autoMLState.selectedTarget) : [];
 
   return (
     <>
@@ -201,12 +242,26 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                 </SelectContent>
               </Select>
               {autoMLState.selectedTarget && (
-                <p className="text-xs text-gray-400 mt-1">
-                  {availableFeatures.length} feature columns available for training
-                  {availableFeatures.length === 0 && (
-                    <span className="text-red-400 block">⚠️ No valid features found. Ensure your data has predictive columns beyond ID fields.</span>
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-gray-400">
+                    ✅ {availableFeatures.length} feature columns will be used for training
+                  </p>
+                  {excludedColumns.length > 0 && (
+                    <p className="text-xs text-red-400">
+                      ⚠️ {excludedColumns.length} columns excluded (ID fields, names, etc.)
+                    </p>
                   )}
-                </p>
+                  {availableFeatures.length === 0 && (
+                    <p className="text-xs text-red-400">
+                      ❌ No valid features found. Ensure your data has predictive columns beyond ID fields.
+                    </p>
+                  )}
+                  {availableFeatures.length > 0 && availableFeatures.length < 2 && (
+                    <p className="text-xs text-yellow-400">
+                      ⚠️ Only {availableFeatures.length} feature available. Consider adding more predictive columns.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -232,7 +287,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
 
             <Button
               onClick={handleTrainModel}
-              disabled={autoMLState.isTraining || availableFeatures.length === 0}
+              disabled={autoMLState.isTraining || availableFeatures.length < 2}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
             >
               {autoMLState.isTraining ? (
@@ -279,21 +334,50 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
               </div>
             </div>
 
-            {autoMLState.selectedTarget && availableFeatures.length > 0 && (
-              <div className="bg-slate-700/30 rounded-lg p-3">
-                <h4 className="text-sm text-white font-medium mb-2">Features to be used:</h4>
-                <div className="flex flex-wrap gap-1">
-                  {availableFeatures.slice(0, 6).map((feature) => (
-                    <Badge key={feature} variant="outline" className="text-xs border-slate-500 text-slate-300">
-                      {feature}
-                    </Badge>
-                  ))}
-                  {availableFeatures.length > 6 && (
-                    <Badge variant="outline" className="text-xs border-slate-500 text-slate-300">
-                      +{availableFeatures.length - 6} more
-                    </Badge>
-                  )}
-                </div>
+            {autoMLState.selectedTarget && (
+              <div className="space-y-3">
+                {availableFeatures.length > 0 && (
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <h4 className="text-sm text-white font-medium mb-2 flex items-center gap-2">
+                      ✅ Features to be used ({availableFeatures.length}):
+                    </h4>
+                    <div className="flex flex-wrap gap-1">
+                      {availableFeatures.slice(0, 8).map((feature) => (
+                        <Badge key={feature} variant="outline" className="text-xs border-green-500 text-green-300">
+                          {feature}
+                        </Badge>
+                      ))}
+                      {availableFeatures.length > 8 && (
+                        <Badge variant="outline" className="text-xs border-green-500 text-green-300">
+                          +{availableFeatures.length - 8} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {excludedColumns.length > 0 && (
+                  <div className="bg-red-600/10 rounded-lg p-3 border border-red-600/30">
+                    <h4 className="text-sm text-red-400 font-medium mb-2 flex items-center gap-2">
+                      ⚠️ Excluded columns ({excludedColumns.length}):
+                    </h4>
+                    <div className="flex flex-wrap gap-1">
+                      {excludedColumns.slice(0, 6).map((column) => (
+                        <Badge key={column} variant="outline" className="text-xs border-red-500 text-red-300">
+                          {column}
+                        </Badge>
+                      ))}
+                      {excludedColumns.length > 6 && (
+                        <Badge variant="outline" className="text-xs border-red-500 text-red-300">
+                          +{excludedColumns.length - 6} more
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-red-300 mt-2">
+                      These columns are automatically excluded as they typically don't provide predictive value (IDs, names, timestamps, etc.)
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -356,6 +440,25 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Feature Usage Summary */}
+              <div className="bg-slate-600/30 rounded-lg p-4">
+                <h4 className="text-white font-medium mb-2">Model Training Summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Features Used:</span>
+                    <span className="text-green-400 font-medium ml-2">{autoMLState.modelResults.usedFeatures.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Columns Excluded:</span>
+                    <span className="text-red-400 font-medium ml-2">{autoMLState.modelResults.excludedColumns.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Target Variable:</span>
+                    <span className="text-blue-400 font-medium ml-2">{autoMLState.selectedTarget}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-4">
