@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, AlertCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +15,7 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
   const { toast } = useToast();
 
   console.log("AuthSection rendered");
@@ -32,7 +33,27 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific authentication errors
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: "Login Failed",
+            description: "The email or password you entered is incorrect. Please check your credentials or create a new account if you haven't signed up yet.",
+            variant: "destructive",
+          });
+          // Suggest switching to sign up mode
+          setShowSignUp(true);
+        } else if (error.message.includes('Email not confirmed')) {
+          toast({
+            title: "Email Not Verified",
+            description: "Please check your email and click the verification link before signing in.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       toast({
         title: "Login Successful",
@@ -61,6 +82,15 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
       return;
     }
 
+    if (password.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     console.log("Sign up attempted:", email);
 
@@ -73,12 +103,27 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please try signing in instead.",
+            variant: "destructive",
+          });
+          setShowSignUp(false);
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       toast({
-        title: "Account Created",
-        description: "Please check your email to verify your account.",
+        title: "Account Created Successfully",
+        description: "Please check your email and click the verification link to complete your registration, then return here to sign in.",
       });
+      
+      // Switch back to sign in mode after successful signup
+      setShowSignUp(false);
     } catch (error: any) {
       console.error("Sign up error:", error);
       toast({
@@ -95,9 +140,14 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
     <div className="max-w-md mx-auto">
       <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-white">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl text-white">
+            {showSignUp ? "Create Account" : "Welcome Back"}
+          </CardTitle>
           <CardDescription className="text-gray-400">
-            Sign in to access your AI-powered data analysis tools
+            {showSignUp 
+              ? "Sign up to start using AI-powered data analysis tools"
+              : "Sign in to access your AI-powered data analysis tools"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,24 +175,69 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-gray-400"
                 required
               />
+              {showSignUp && (
+                <p className="text-xs text-gray-400">Password must be at least 6 characters long</p>
+              )}
             </div>
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-              disabled={isLoading}
-            >
-              {isLoading ? "Signing In..." : "Sign In"}
-            </Button>
-            <Button 
-              type="button"
-              variant="outline"
-              className="w-full border-slate-600 text-gray-300 hover:bg-slate-700"
-              onClick={handleSignUp}
-              disabled={isLoading}
-            >
-              {isLoading ? "Creating Account..." : "Create Account"}
-            </Button>
+
+            {!showSignUp ? (
+              <>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing In..." : "Sign In"}
+                </Button>
+                <div className="text-center">
+                  <p className="text-sm text-gray-400 mb-2">Don't have an account?</p>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-600 text-gray-300 hover:bg-slate-700"
+                    onClick={() => setShowSignUp(true)}
+                    disabled={isLoading}
+                  >
+                    Create New Account
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Button 
+                  type="button"
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  onClick={handleSignUp}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Creating Account..." : "Create Account"}
+                </Button>
+                <div className="text-center">
+                  <p className="text-sm text-gray-400 mb-2">Already have an account?</p>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-600 text-gray-300 hover:bg-slate-700"
+                    onClick={() => setShowSignUp(false)}
+                    disabled={isLoading}
+                  >
+                    Sign In Instead
+                  </Button>
+                </div>
+              </>
+            )}
           </form>
+
+          {/* Help text */}
+          <div className="mt-6 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+            <div className="flex items-start space-x-2">
+              <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-gray-300">
+                <p className="font-medium mb-1">First time here?</p>
+                <p>Create an account and check your email for a verification link. You'll need to verify your email before you can sign in.</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
