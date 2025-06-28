@@ -1,11 +1,11 @@
-
 import { useState, useRef } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Upload, FileText, Image, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 interface DataUploadProps {
   onDataUploaded: (data: any) => void;
@@ -19,48 +19,247 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
 
   console.log("DataUpload component rendered");
 
+  const detectDataTypes = (rows: any[]): Record<string, string> => {
+    if (!rows || rows.length === 0) return {};
+    
+    const columns = Object.keys(rows[0]);
+    const dataTypes: Record<string, string> = {};
+    
+    columns.forEach(column => {
+      const sampleValues = rows.slice(0, 10).map(row => row[column]).filter(val => val !== null && val !== undefined && val !== "");
+      
+      if (sampleValues.length === 0) {
+        dataTypes[column] = "unknown";
+        return;
+      }
+      
+      const isAllNumbers = sampleValues.every(val => !isNaN(Number(val)) && val !== "");
+      const isAllDates = sampleValues.every(val => !isNaN(Date.parse(val)));
+      
+      if (isAllNumbers) {
+        dataTypes[column] = "number";
+      } else if (isAllDates) {
+        dataTypes[column] = "date";
+      } else {
+        dataTypes[column] = "string";
+      }
+    });
+    
+    return dataTypes;
+  };
+
+  const calculateStatistics = (rows: any[]) => {
+    if (!rows || rows.length === 0) {
+      return {
+        totalRows: 0,
+        totalColumns: 0,
+        missingValues: 0,
+        dataTypes: {}
+      };
+    }
+
+    const columns = Object.keys(rows[0]);
+    let missingValues = 0;
+    
+    rows.forEach(row => {
+      columns.forEach(column => {
+        if (row[column] === null || row[column] === undefined || row[column] === "") {
+          missingValues++;
+        }
+      });
+    });
+
+    return {
+      totalRows: rows.length,
+      totalColumns: columns.length,
+      missingValues,
+      dataTypes: detectDataTypes(rows)
+    };
+  };
+
+  const parseCSVFile = (file: File): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.errors.length > 0) {
+            console.error("CSV parsing errors:", results.errors);
+          }
+          
+          const rows = results.data as any[];
+          const columns = results.meta.fields || [];
+          const statistics = calculateStatistics(rows);
+          
+          const parsedData = {
+            filename: file.name,
+            type: file.type,
+            size: file.size,
+            columns,
+            rows,
+            statistics
+          };
+          
+          resolve(parsedData);
+        },
+        error: (error) => {
+          reject(error);
+        }
+      });
+    });
+  };
+
+  const parseExcelFile = (file: File): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Get the first worksheet
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert to JSON
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (jsonData.length === 0) {
+            reject(new Error("Empty Excel file"));
+            return;
+          }
+          
+          // Extract headers and rows
+          const headers = jsonData[0] as string[];
+          const dataRows = jsonData.slice(1).map(row => {
+            const rowObj: any = {};
+            headers.forEach((header, index) => {
+              rowObj[header] = (row as any[])[index] || "";
+            });
+            return rowObj;
+          });
+          
+          const statistics = calculateStatistics(dataRows);
+          
+          const parsedData = {
+            filename: file.name,
+            type: file.type,
+            size: file.size,
+            columns: headers,
+            rows: dataRows,
+            statistics
+          };
+          
+          resolve(parsedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error("Failed to read Excel file"));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const parseTextFile = (file: File): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const lines = content.split('\n').filter(line => line.trim() !== '');
+          
+          if (lines.length === 0) {
+            reject(new Error("Empty text file"));
+            return;
+          }
+          
+          // Try to detect delimiter
+          const firstLine = lines[0];
+          let delimiter = ',';
+          if (firstLine.includes('\t')) delimiter = '\t';
+          else if (firstLine.includes(';')) delimiter = ';';
+          else if (firstLine.includes('|')) delimiter = '|';
+          
+          const headers = firstLine.split(delimiter).map(h => h.trim());
+          const dataRows = lines.slice(1).map(line => {
+            const values = line.split(delimiter);
+            const rowObj: any = {};
+            headers.forEach((header, index) => {
+              rowObj[header] = values[index]?.trim() || "";
+            });
+            return rowObj;
+          });
+          
+          const statistics = calculateStatistics(dataRows);
+          
+          const parsedData = {
+            filename: file.name,
+            type: file.type,
+            size: file.size,
+            columns: headers,
+            rows: dataRows,
+            statistics
+          };
+          
+          resolve(parsedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error("Failed to read text file"));
+      reader.readAsText(file);
+    });
+  };
+
   const handleFiles = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
 
-    console.log("Processing file:", file.name, file.type);
+    console.log("Processing file:", file.name, file.type, file.size);
     setIsProcessing(true);
 
-    // Simulate file processing
-    setTimeout(() => {
-      const mockData = {
-        filename: file.name,
-        type: file.type,
-        size: file.size,
-        columns: ["Name", "Age", "Email", "City", "Salary"],
-        rows: [
-          ["John Doe", 28, "john@example.com", "New York", 50000],
-          ["Jane Smith", 32, "jane@example.com", "Los Angeles", 65000],
-          ["Bob Johnson", 45, "bob@example.com", "Chicago", 75000],
-          ["Alice Brown", 29, "alice@example.com", "Houston", 55000],
-          ["Charlie Wilson", 38, "charlie@example.com", "Phoenix", 68000],
-        ],
-        statistics: {
-          totalRows: 5,
-          totalColumns: 5,
-          missingValues: 0,
-          dataTypes: {
-            "Name": "string",
-            "Age": "number",
-            "Email": "string", 
-            "City": "string",
-            "Salary": "number"
-          }
-        }
-      };
+    try {
+      let parsedData;
+      
+      // Determine file type and parse accordingly
+      if (file.type === "text/csv" || file.name.toLowerCase().endsWith('.csv')) {
+        parsedData = await parseCSVFile(file);
+      } else if (
+        file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.type === "application/vnd.ms-excel" ||
+        file.name.toLowerCase().endsWith('.xlsx') ||
+        file.name.toLowerCase().endsWith('.xls')
+      ) {
+        parsedData = await parseExcelFile(file);
+      } else if (
+        file.type === "text/plain" ||
+        file.name.toLowerCase().endsWith('.txt') ||
+        file.name.toLowerCase().endsWith('.tsv')
+      ) {
+        parsedData = await parseTextFile(file);
+      } else {
+        throw new Error(`Unsupported file type: ${file.type || 'unknown'}`);
+      }
 
-      onDataUploaded(mockData);
+      onDataUploaded(parsedData);
       toast({
         title: "File Uploaded Successfully",
-        description: `Processed ${file.name} with ${mockData.statistics.totalRows} rows`,
+        description: `Processed ${file.name} with ${parsedData.statistics.totalRows} rows and ${parsedData.statistics.totalColumns} columns`,
       });
+    } catch (error: any) {
+      console.error("File processing error:", error);
+      toast({
+        title: "File Processing Failed",
+        description: error.message || "Failed to process the uploaded file. Please check the file format and try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -97,7 +296,7 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
           Data Import Module
         </CardTitle>
         <CardDescription className="text-gray-400">
-          Upload CSV, Excel files, images with OCR, or PDF documents
+          Upload CSV, Excel files, or text files with tabular data
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -129,7 +328,7 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
                   Drag and drop your files here
                 </p>
                 <p className="text-sm text-gray-400">
-                  Supports CSV, Excel, PDF, and Images (JPG, PNG)
+                  Supports CSV, Excel (XLSX/XLS), and Text files
                 </p>
               </div>
               <Button 
@@ -146,22 +345,22 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png"
+          accept=".csv,.xlsx,.xls,.txt,.tsv"
           onChange={handleFileInput}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-slate-700/50 p-4 rounded-lg">
-            <h3 className="text-white font-semibold mb-2">Structured Data</h3>
-            <p className="text-sm text-gray-400">CSV, Excel files with automatic column detection</p>
+            <h3 className="text-white font-semibold mb-2">CSV Files</h3>
+            <p className="text-sm text-gray-400">Comma-separated values with automatic delimiter detection</p>
           </div>
           <div className="bg-slate-700/50 p-4 rounded-lg">
-            <h3 className="text-white font-semibold mb-2">OCR Processing</h3>
-            <p className="text-sm text-gray-400">Extract tables from images using AI vision</p>
+            <h3 className="text-white font-semibold mb-2">Excel Files</h3>
+            <p className="text-sm text-gray-400">XLSX and XLS spreadsheet files (first sheet only)</p>
           </div>
           <div className="bg-slate-700/50 p-4 rounded-lg">
-            <h3 className="text-white font-semibold mb-2">PDF Parsing</h3>
-            <p className="text-sm text-gray-400">Smart extraction of tabular data from PDFs</p>
+            <h3 className="text-white font-semibold mb-2">Text Files</h3>
+            <p className="text-sm text-gray-400">Tab-separated, pipe-delimited, or other structured text</p>
           </div>
         </div>
       </CardContent>
