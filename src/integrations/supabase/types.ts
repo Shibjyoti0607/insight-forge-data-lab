@@ -9,7 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      user_data: {
+        Row: {
+          id: string
+          uploaded_data: Json | null
+          cleaned_data: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          uploaded_data?: Json | null
+          cleaned_data?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          uploaded_data?: Json | null
+          cleaned_data?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_data_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
