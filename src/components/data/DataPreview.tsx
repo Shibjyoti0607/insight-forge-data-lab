@@ -40,21 +40,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
 
   // Filter data based on search term and selected filters
   const filteredRows = data.rows.filter((row: any) => {
-    // Search filter
-    if (searchTerm) {
-      const searchMatch = Object.values(row).some((value: any) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      if (!searchMatch) return false;
-    }
-
-    // Column filter
-    if (selectedColumn !== "all") {
-      const columnValue = String(row[selectedColumn]).toLowerCase();
-      if (!columnValue.includes(searchTerm.toLowerCase())) return false;
-    }
-
-    // Data type filter
+    // Data type filter - check if row has columns of the selected type
     if (selectedDataType !== "all") {
       const hasColumnOfType = data.columns.some((column: string) => 
         data.statistics.dataTypes[column] === selectedDataType && 
@@ -65,6 +51,27 @@ const DataPreview = ({ data }: DataPreviewProps) => {
       if (!hasColumnOfType) return false;
     }
 
+    // Column filter - if a specific column is selected
+    if (selectedColumn !== "all") {
+      // If there's a search term, search only in the selected column
+      if (searchTerm) {
+        const columnValue = String(row[selectedColumn] || "").toLowerCase();
+        return columnValue.includes(searchTerm.toLowerCase());
+      } else {
+        // If no search term, just show rows where the selected column has a value
+        const columnValue = row[selectedColumn];
+        return columnValue !== null && columnValue !== undefined && columnValue !== "";
+      }
+    }
+
+    // Search filter - if no specific column is selected, search across all columns
+    if (searchTerm) {
+      return Object.values(row).some((value: any) =>
+        String(value || "").toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // If no filters are applied, show all rows
     return true;
   });
 
@@ -140,7 +147,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search in all columns..."
+                  placeholder={selectedColumn !== "all" ? `Search in ${selectedColumn}...` : "Search in all columns..."}
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
