@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,10 +15,20 @@ const Index = () => {
   const [uploadedData, setUploadedData] = useState(null);
   const [cleanedData, setCleanedData] = useState(null);
   const [activeTab, setActiveTab] = useState("upload");
+  
+  // AutoML state that persists across tab switches
+  const [autoMLState, setAutoMLState] = useState({
+    selectedTarget: "",
+    selectedTask: "",
+    isTraining: false,
+    modelResults: null,
+    showInsights: false
+  });
 
   console.log("Index component rendered");
   console.log("Is authenticated:", isAuthenticated);
   console.log("Uploaded data:", uploadedData ? "Present" : "None");
+  console.log("AutoML state:", autoMLState);
 
   if (!isAuthenticated) {
     return (
@@ -83,6 +92,9 @@ const Index = () => {
             >
               <Brain className="h-4 w-4" />
               <span className="hidden sm:inline">AutoML</span>
+              {autoMLState.modelResults && (
+                <div className="w-2 h-2 bg-green-400 rounded-full ml-1"></div>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -109,7 +121,11 @@ const Index = () => {
 
           <TabsContent value="ml" className="space-y-6">
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-              <AutoMLSection data={cleanedData || uploadedData} />
+              <AutoMLSection 
+                data={cleanedData || uploadedData}
+                autoMLState={autoMLState}
+                setAutoMLState={setAutoMLState}
+              />
             </Card>
           </TabsContent>
         </Tabs>

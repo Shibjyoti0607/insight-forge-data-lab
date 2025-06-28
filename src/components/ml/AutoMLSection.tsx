@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,17 +9,21 @@ import BusinessInsights from "./BusinessInsights";
 
 interface AutoMLSectionProps {
   data: any;
+  autoMLState: {
+    selectedTarget: string;
+    selectedTask: string;
+    isTraining: boolean;
+    modelResults: any;
+    showInsights: boolean;
+  };
+  setAutoMLState: (state: any) => void;
 }
 
-const AutoMLSection = ({ data }: AutoMLSectionProps) => {
-  const [selectedTarget, setSelectedTarget] = useState("");
-  const [selectedTask, setSelectedTask] = useState("");
-  const [isTraining, setIsTraining] = useState(false);
-  const [modelResults, setModelResults] = useState(null);
-  const [showInsights, setShowInsights] = useState(false);
+const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps) => {
   const { toast } = useToast();
 
   console.log("AutoMLSection component rendered with data:", data);
+  console.log("AutoML state:", autoMLState);
 
   if (!data) {
     return (
@@ -57,7 +60,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
   };
 
   const handleTrainModel = async () => {
-    if (!selectedTarget || !selectedTask) {
+    if (!autoMLState.selectedTarget || !autoMLState.selectedTask) {
       toast({
         title: "Configuration Required",
         description: "Please select target column and task type",
@@ -66,11 +69,11 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
       return;
     }
 
-    setIsTraining(true);
-    console.log("Training model with:", { selectedTarget, selectedTask });
+    setAutoMLState(prev => ({ ...prev, isTraining: true }));
+    console.log("Training model with:", { selectedTarget: autoMLState.selectedTarget, selectedTask: autoMLState.selectedTask });
 
     // Get feature columns (excluding ID columns and target)
-    const featureColumns = getFeatureColumns(data.columns, selectedTarget);
+    const featureColumns = getFeatureColumns(data.columns, autoMLState.selectedTarget);
     
     if (featureColumns.length === 0) {
       toast({
@@ -78,28 +81,28 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
         description: "No suitable feature columns found for training. Please ensure your data has predictive features beyond ID columns.",
         variant: "destructive",
       });
-      setIsTraining(false);
+      setAutoMLState(prev => ({ ...prev, isTraining: false }));
       return;
     }
 
     // Simulate ML model training
     setTimeout(() => {
       const mockResults = {
-        bestModel: selectedTask === "classification" ? "Random Forest" : "Linear Regression",
-        accuracy: selectedTask === "classification" ? 0.94 : null,
-        r2Score: selectedTask === "regression" ? 0.87 : null,
-        mse: selectedTask === "regression" ? 0.15 : null,
+        bestModel: autoMLState.selectedTask === "classification" ? "Random Forest" : "Linear Regression",
+        accuracy: autoMLState.selectedTask === "classification" ? 0.94 : null,
+        r2Score: autoMLState.selectedTask === "regression" ? 0.87 : null,
+        mse: autoMLState.selectedTask === "regression" ? 0.15 : null,
         crossValidationScore: 0.91,
         // Only include actual feature columns, not ID columns
         featureImportance: featureColumns.slice(0, 4).map((col, index) => ({
           feature: col,
           importance: [0.35, 0.28, 0.22, 0.15][index] || 0.1
         })),
-        confusionMatrix: selectedTask === "classification" ? [
+        confusionMatrix: autoMLState.selectedTask === "classification" ? [
           [45, 3],
           [2, 50]
         ] : null,
-        modelComparison: selectedTask === "classification" ? [
+        modelComparison: autoMLState.selectedTask === "classification" ? [
           { model: "Random Forest", accuracy: 0.94, precision: 0.92, recall: 0.96 },
           { model: "SVM", accuracy: 0.89, precision: 0.87, recall: 0.91 },
           { model: "Logistic Regression", accuracy: 0.85, precision: 0.83, recall: 0.87 },
@@ -127,13 +130,17 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
         usedFeatures: featureColumns // Track which features were actually used
       };
 
-      setModelResults(mockResults);
-      setShowInsights(true);
+      setAutoMLState(prev => ({
+        ...prev,
+        modelResults: mockResults,
+        showInsights: true,
+        isTraining: false
+      }));
+
       toast({
         title: "Model Training Complete",
         description: `Best model: ${mockResults.bestModel} with ${(mockResults.crossValidationScore * 100).toFixed(1)}% CV score using ${featureColumns.length} features`,
       });
-      setIsTraining(false);
     }, 3000);
   };
 
@@ -150,7 +157,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'];
 
   // Get available feature columns for display
-  const availableFeatures = selectedTarget ? getFeatureColumns(data.columns, selectedTarget) : [];
+  const availableFeatures = autoMLState.selectedTarget ? getFeatureColumns(data.columns, autoMLState.selectedTarget) : [];
 
   return (
     <>
@@ -158,9 +165,19 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
         <CardTitle className="text-white flex items-center gap-2">
           <Brain className="h-5 w-5" />
           AI-Powered AutoML Engine
+          {autoMLState.modelResults && (
+            <Badge className="bg-green-600 text-white ml-2">
+              Model Trained
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription className="text-gray-400">
           Automatic model selection and hyperparameter tuning
+          {autoMLState.modelResults && (
+            <span className="text-green-400 ml-2">
+              • {autoMLState.modelResults.bestModel} ready for deployment
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -168,7 +185,10 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
           <div className="space-y-4">
             <div>
               <label className="text-white font-medium mb-2 block">Target Column</label>
-              <Select value={selectedTarget} onValueChange={setSelectedTarget}>
+              <Select 
+                value={autoMLState.selectedTarget} 
+                onValueChange={(value) => setAutoMLState(prev => ({ ...prev, selectedTarget: value }))}
+              >
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Select target variable" />
                 </SelectTrigger>
@@ -180,7 +200,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                   ))}
                 </SelectContent>
               </Select>
-              {selectedTarget && (
+              {autoMLState.selectedTarget && (
                 <p className="text-xs text-gray-400 mt-1">
                   {availableFeatures.length} feature columns available for training
                   {availableFeatures.length === 0 && (
@@ -192,7 +212,10 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
 
             <div>
               <label className="text-white font-medium mb-2 block">Task Type</label>
-              <Select value={selectedTask} onValueChange={setSelectedTask}>
+              <Select 
+                value={autoMLState.selectedTask} 
+                onValueChange={(value) => setAutoMLState(prev => ({ ...prev, selectedTask: value }))}
+              >
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Select ML task" />
                 </SelectTrigger>
@@ -209,13 +232,18 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
 
             <Button
               onClick={handleTrainModel}
-              disabled={isTraining || availableFeatures.length === 0}
+              disabled={autoMLState.isTraining || availableFeatures.length === 0}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
             >
-              {isTraining ? (
+              {autoMLState.isTraining ? (
                 <>
                   <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
                   Training Models...
+                </>
+              ) : autoMLState.modelResults ? (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Retrain Model
                 </>
               ) : (
                 <>
@@ -251,7 +279,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
               </div>
             </div>
 
-            {selectedTarget && availableFeatures.length > 0 && (
+            {autoMLState.selectedTarget && availableFeatures.length > 0 && (
               <div className="bg-slate-700/30 rounded-lg p-3">
                 <h4 className="text-sm text-white font-medium mb-2">Features to be used:</h4>
                 <div className="flex flex-wrap gap-1">
@@ -271,7 +299,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
           </div>
         </div>
 
-        {modelResults && (
+        {autoMLState.modelResults && (
           <div className="space-y-6">
             {/* Model Performance Summary */}
             <div className="bg-slate-700/30 rounded-lg p-6 space-y-4">
@@ -282,11 +310,11 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                 </h3>
                 <div className="flex gap-2">
                   <Badge className="bg-green-600">
-                    Best: {modelResults.bestModel}
+                    Best: {autoMLState.modelResults.bestModel}
                   </Badge>
-                  {showInsights && (
+                  {autoMLState.showInsights && (
                     <Button
-                      onClick={() => setShowInsights(!showInsights)}
+                      onClick={() => setAutoMLState(prev => ({ ...prev, showInsights: !prev.showInsights }))}
                       size="sm"
                       className="bg-yellow-600 hover:bg-yellow-700"
                     >
@@ -298,33 +326,33 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {modelResults.accuracy && (
+                {autoMLState.modelResults.accuracy && (
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">Accuracy</p>
                     <p className="text-xl font-bold text-white">
-                      {(modelResults.accuracy * 100).toFixed(1)}%
+                      {(autoMLState.modelResults.accuracy * 100).toFixed(1)}%
                     </p>
                   </div>
                 )}
-                {modelResults.r2Score && (
+                {autoMLState.modelResults.r2Score && (
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">R² Score</p>
                     <p className="text-xl font-bold text-white">
-                      {modelResults.r2Score.toFixed(3)}
+                      {autoMLState.modelResults.r2Score.toFixed(3)}
                     </p>
                   </div>
                 )}
                 <div className="bg-slate-700/50 p-3 rounded-lg">
                   <p className="text-sm text-gray-400">CV Score</p>
                   <p className="text-xl font-bold text-white">
-                    {(modelResults.crossValidationScore * 100).toFixed(1)}%
+                    {(autoMLState.modelResults.crossValidationScore * 100).toFixed(1)}%
                   </p>
                 </div>
-                {modelResults.mse && (
+                {autoMLState.modelResults.mse && (
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">MSE</p>
                     <p className="text-xl font-bold text-white">
-                      {modelResults.mse.toFixed(3)}
+                      {autoMLState.modelResults.mse.toFixed(3)}
                     </p>
                   </div>
                 )}
@@ -342,11 +370,11 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
             </div>
 
             {/* Business Insights Section */}
-            {showInsights && (
+            {autoMLState.showInsights && (
               <BusinessInsights 
-                modelResults={modelResults}
-                selectedTarget={selectedTarget}
-                selectedTask={selectedTask}
+                modelResults={autoMLState.modelResults}
+                selectedTarget={autoMLState.selectedTarget}
+                selectedTask={autoMLState.selectedTask}
                 data={data}
               />
             )}
@@ -359,7 +387,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
               </h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={modelResults.modelComparison}>
+                  <BarChart data={autoMLState.modelResults.modelComparison}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis 
                       dataKey="model" 
@@ -378,7 +406,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                         color: '#F9FAFB'
                       }}
                     />
-                    {selectedTask === "classification" ? (
+                    {autoMLState.selectedTask === "classification" ? (
                       <>
                         <Bar dataKey="accuracy" fill="#8B5CF6" name="Accuracy" />
                         <Bar dataKey="precision" fill="#06B6D4" name="Precision" />
@@ -405,7 +433,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={modelResults.featureImportance} layout="horizontal">
+                    <BarChart data={autoMLState.modelResults.featureImportance} layout="horizontal">
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
                       <YAxis 
@@ -437,7 +465,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={modelResults.trainingHistory}>
+                    <LineChart data={autoMLState.modelResults.trainingHistory}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="epoch" stroke="#9CA3AF" fontSize={12} />
                       <YAxis stroke="#9CA3AF" fontSize={12} />
@@ -477,7 +505,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                   <thead>
                     <tr className="border-b border-slate-600">
                       <th className="text-left p-3 text-gray-300 font-medium">Model</th>
-                      {selectedTask === "classification" ? (
+                      {autoMLState.selectedTask === "classification" ? (
                         <>
                           <th className="text-left p-3 text-gray-300 font-medium">Accuracy</th>
                           <th className="text-left p-3 text-gray-300 font-medium">Precision</th>
@@ -496,10 +524,10 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {modelResults.modelComparison.map((model: any, index: number) => (
+                    {autoMLState.modelResults.modelComparison.map((model: any, index: number) => (
                       <tr key={index} className="border-b border-slate-600/50">
                         <td className="p-3 text-white font-medium">{model.model}</td>
-                        {selectedTask === "classification" ? (
+                        {autoMLState.selectedTask === "classification" ? (
                           <>
                             <td className="p-3 text-gray-400">{(model.accuracy * 100).toFixed(1)}%</td>
                             <td className="p-3 text-gray-400">{(model.precision * 100).toFixed(1)}%</td>
@@ -531,12 +559,12 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
             </div>
 
             {/* Predictions vs Actual (for regression) */}
-            {selectedTask === "regression" && (
+            {autoMLState.selectedTask === "regression" && (
               <div className="bg-slate-700/30 rounded-lg p-6">
                 <h3 className="text-white font-semibold mb-4">Predictions vs Actual Values</h3>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={modelResults.predictions.slice(0, 10)}>
+                    <BarChart data={autoMLState.modelResults.predictions.slice(0, 10)}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="index" stroke="#9CA3AF" fontSize={12} />
                       <YAxis stroke="#9CA3AF" fontSize={12} />
@@ -557,24 +585,24 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
             )}
 
             {/* Confusion Matrix (for classification) */}
-            {selectedTask === "classification" && modelResults.confusionMatrix && (
+            {autoMLState.selectedTask === "classification" && autoMLState.modelResults.confusionMatrix && (
               <div className="bg-slate-700/30 rounded-lg p-6">
                 <h3 className="text-white font-semibold mb-4">Confusion Matrix</h3>
                 <div className="grid grid-cols-2 gap-2 max-w-md">
                   <div className="bg-slate-600 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-white">{modelResults.confusionMatrix[0][0]}</div>
+                    <div className="text-2xl font-bold text-white">{autoMLState.modelResults.confusionMatrix[0][0]}</div>
                     <div className="text-xs text-gray-400">True Negative</div>
                   </div>
                   <div className="bg-red-600/30 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-white">{modelResults.confusionMatrix[0][1]}</div>
+                    <div className="text-2xl font-bold text-white">{autoMLState.modelResults.confusionMatrix[0][1]}</div>
                     <div className="text-xs text-gray-400">False Positive</div>
                   </div>
                   <div className="bg-red-600/30 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-white">{modelResults.confusionMatrix[1][0]}</div>
+                    <div className="text-2xl font-bold text-white">{autoMLState.modelResults.confusionMatrix[1][0]}</div>
                     <div className="text-xs text-gray-400">False Negative</div>
                   </div>
                   <div className="bg-green-600/30 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-white">{modelResults.confusionMatrix[1][1]}</div>
+                    <div className="text-2xl font-bold text-white">{autoMLState.modelResults.confusionMatrix[1][1]}</div>
                     <div className="text-xs text-gray-400">True Positive</div>
                   </div>
                 </div>
