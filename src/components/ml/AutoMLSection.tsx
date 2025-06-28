@@ -719,16 +719,6 @@ const AutoMLSection = ({
                   Feature Importance
                 </h3>
                 
-                {/* Debug information */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="mb-4 p-2 bg-slate-600/30 rounded text-xs text-gray-400">
-                    Debug: {featureImportanceChartData.length} features loaded
-                    {featureImportanceChartData.length > 0 && (
-                      <div>Sample: {JSON.stringify(featureImportanceChartData[0])}</div>
-                    )}
-                  </div>
-                )}
-                
                 {featureImportanceChartData.length > 0 ? (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
