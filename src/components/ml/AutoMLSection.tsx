@@ -552,15 +552,26 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                 </h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={autoMLState.modelResults.featureImportance} layout="horizontal">
+                    <BarChart 
+                      data={autoMLState.modelResults.featureImportance} 
+                      layout="horizontal"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
+                      <XAxis 
+                        type="number" 
+                        stroke="#9CA3AF" 
+                        fontSize={12}
+                        domain={[0, 'dataMax']}
+                        tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                      />
                       <YAxis 
                         type="category" 
                         dataKey="feature" 
                         stroke="#9CA3AF" 
-                        fontSize={12}
-                        width={80}
+                        fontSize={11}
+                        width={100}
+                        tick={{ fontSize: 11 }}
                       />
                       <Tooltip 
                         contentStyle={{ 
@@ -569,10 +580,36 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                           borderRadius: '8px',
                           color: '#F9FAFB'
                         }}
+                        formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, 'Importance']}
                       />
-                      <Bar dataKey="importance" fill="#8B5CF6" />
+                      <Bar 
+                        dataKey="importance" 
+                        fill="#8B5CF6"
+                        radius={[0, 4, 4, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+                
+                {/* Feature Importance List */}
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-sm text-gray-400 font-medium">Top Features:</h4>
+                  {autoMLState.modelResults.featureImportance.slice(0, 5).map((item: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between bg-slate-600/30 rounded px-3 py-2">
+                      <span className="text-white text-sm">{item.feature}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-slate-600 rounded-full h-2">
+                          <div 
+                            className="bg-purple-500 h-2 rounded-full" 
+                            style={{ width: `${item.importance * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-400 text-xs w-12 text-right">
+                          {(item.importance * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -602,6 +639,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                         stroke="#EF4444" 
                         strokeWidth={2}
                         name="Training Loss"
+                        dot={{ fill: '#EF4444', strokeWidth: 2, r: 3 }}
                       />
                       <Line 
                         type="monotone" 
@@ -609,6 +647,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                         stroke="#F59E0B" 
                         strokeWidth={2}
                         name="Validation Loss"
+                        dot={{ fill: '#F59E0B', strokeWidth: 2, r: 3 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
