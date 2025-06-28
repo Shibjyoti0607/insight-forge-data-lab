@@ -126,17 +126,29 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
 
     // Simulate ML model training
     setTimeout(() => {
+      // Create realistic feature importance data based on actual feature columns
+      const featureImportanceData = featureColumns.slice(0, Math.min(8, featureColumns.length)).map((col, index) => {
+        // Generate realistic importance values that sum to approximately 1
+        const baseImportance = [0.35, 0.25, 0.18, 0.12, 0.08, 0.06, 0.04, 0.03][index] || 0.02;
+        const randomVariation = (Math.random() - 0.5) * 0.1; // Add some randomness
+        const importance = Math.max(0.01, Math.min(0.5, baseImportance + randomVariation));
+        
+        return {
+          feature: col,
+          importance: importance,
+          // Add display name for better readability
+          displayName: col.length > 15 ? col.substring(0, 12) + "..." : col
+        };
+      }).sort((a, b) => b.importance - a.importance); // Sort by importance descending
+
       const mockResults = {
         bestModel: autoMLState.selectedTask === "classification" ? "Random Forest" : "Linear Regression",
         accuracy: autoMLState.selectedTask === "classification" ? 0.94 : null,
         r2Score: autoMLState.selectedTask === "regression" ? 0.87 : null,
         mse: autoMLState.selectedTask === "regression" ? 0.15 : null,
         crossValidationScore: 0.91,
-        // Only include actual feature columns, not ID columns
-        featureImportance: featureColumns.slice(0, Math.min(6, featureColumns.length)).map((col, index) => ({
-          feature: col,
-          importance: [0.35, 0.28, 0.22, 0.15, 0.12, 0.08][index] || 0.05
-        })),
+        // Use the properly formatted feature importance data
+        featureImportance: featureImportanceData,
         confusionMatrix: autoMLState.selectedTask === "classification" ? [
           [45, 3],
           [2, 50]
@@ -169,6 +181,8 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
         usedFeatures: featureColumns, // Track which features were actually used
         excludedColumns: data.columns.filter((col: string) => !featureColumns.includes(col) && col !== autoMLState.selectedTarget)
       };
+
+      console.log("Generated feature importance data:", featureImportanceData);
 
       setAutoMLState(prev => ({
         ...prev,
@@ -550,12 +564,20 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                   <TrendingUp className="h-5 w-5" />
                   Feature Importance
                 </h3>
+                
+                {/* Debug information */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mb-4 p-2 bg-slate-600/30 rounded text-xs text-gray-400">
+                    Debug: {autoMLState.modelResults.featureImportance?.length || 0} features loaded
+                  </div>
+                )}
+                
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart 
-                      data={autoMLState.modelResults.featureImportance} 
+                      data={autoMLState.modelResults.featureImportance || []} 
                       layout="horizontal"
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis 
@@ -567,10 +589,10 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                       />
                       <YAxis 
                         type="category" 
-                        dataKey="feature" 
+                        dataKey="displayName"
                         stroke="#9CA3AF" 
                         fontSize={11}
-                        width={100}
+                        width={75}
                         tick={{ fontSize: 11 }}
                       />
                       <Tooltip 
@@ -580,7 +602,14 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                           borderRadius: '8px',
                           color: '#F9FAFB'
                         }}
-                        formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, 'Importance']}
+                        formatter={(value: any, name: any, props: any) => [
+                          `${(value * 100).toFixed(1)}%`, 
+                          'Importance',
+                          props.payload.feature // Show full feature name in tooltip
+                        ]}
+                        labelFormatter={(label: any, payload: any) => {
+                          return payload && payload[0] ? `Feature: ${payload[0].payload.feature}` : label;
+                        }}
                       />
                       <Bar 
                         dataKey="importance" 
@@ -594,22 +623,30 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                 {/* Feature Importance List */}
                 <div className="mt-4 space-y-2">
                   <h4 className="text-sm text-gray-400 font-medium">Top Features:</h4>
-                  {autoMLState.modelResults.featureImportance.slice(0, 5).map((item: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between bg-slate-600/30 rounded px-3 py-2">
-                      <span className="text-white text-sm">{item.feature}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-slate-600 rounded-full h-2">
-                          <div 
-                            className="bg-purple-500 h-2 rounded-full" 
-                            style={{ width: `${item.importance * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-400 text-xs w-12 text-right">
-                          {(item.importance * 100).toFixed(1)}%
+                  {autoMLState.modelResults.featureImportance && autoMLState.modelResults.featureImportance.length > 0 ? (
+                    autoMLState.modelResults.featureImportance.slice(0, 5).map((item: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between bg-slate-600/30 rounded px-3 py-2">
+                        <span className="text-white text-sm" title={item.feature}>
+                          {item.displayName || item.feature}
                         </span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-slate-600 rounded-full h-2">
+                            <div 
+                              className="bg-purple-500 h-2 rounded-full" 
+                              style={{ width: `${Math.max(5, item.importance * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-gray-400 text-xs w-12 text-right">
+                            {(item.importance * 100).toFixed(1)}%
+                          </span>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      No feature importance data available
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
