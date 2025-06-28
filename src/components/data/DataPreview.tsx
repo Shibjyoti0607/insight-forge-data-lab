@@ -1,4 +1,3 @@
-
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Database, BarChart3 } from "lucide-react";
@@ -93,11 +92,11 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.slice(0, 5).map((row: any[], rowIndex: number) => (
+                  {data.rows.slice(0, 5).map((row: any, rowIndex: number) => (
                     <tr key={rowIndex} className="border-b border-slate-600/50">
-                      {row.map((cell: any, cellIndex: number) => (
+                      {data.columns.map((column: string, cellIndex: number) => (
                         <td key={cellIndex} className="p-3 text-gray-400">
-                          {cell}
+                          {row[column]}
                         </td>
                       ))}
                     </tr>
