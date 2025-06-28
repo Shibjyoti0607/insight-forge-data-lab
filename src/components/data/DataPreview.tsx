@@ -15,7 +15,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
   const [selectedColumn, setSelectedColumn] = useState("all");
   const [selectedDataType, setSelectedDataType] = useState("all");
   const [sortOrder, setSortOrder] = useState("asc");
-  const [sortColumn, setSortColumn] = useState("");
+  const [sortColumn, setSortColumn] = useState("none");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 20;
 
@@ -78,7 +78,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
   });
 
   // Sort data if a sort column is selected
-  if (sortColumn && data.columns.includes(sortColumn)) {
+  if (sortColumn && sortColumn !== "none" && data.columns.includes(sortColumn)) {
     filteredRows = [...filteredRows].sort((a, b) => {
       const aValue = a[sortColumn];
       const bValue = b[sortColumn];
@@ -120,7 +120,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
     setSearchTerm("");
     setSelectedColumn("all");
     setSelectedDataType("all");
-    setSortColumn("");
+    setSortColumn("none");
     setSortOrder("asc");
     setCurrentPage(1);
   };
@@ -134,7 +134,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
         </CardTitle>
         <CardDescription className="text-gray-400">
           {data.filename} • {filteredRows.length} of {data.statistics.totalRows} rows × {data.statistics.totalColumns} columns
-          {sortColumn && (
+          {sortColumn && sortColumn !== "none" && (
             <span className="ml-2 text-purple-400">
               • Sorted by {sortColumn} ({sortOrder === "asc" ? "Ascending" : "Descending"})
             </span>
@@ -167,7 +167,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-4 w-4 text-gray-400" />
             <h3 className="text-white font-semibold">Filters</h3>
-            {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all" || sortColumn) && (
+            {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all" || sortColumn !== "none") && (
               <Button
                 onClick={clearFilters}
                 size="sm"
@@ -251,7 +251,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                   <SelectValue placeholder="Select column to sort" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="" className="text-white">No Sorting</SelectItem>
+                  <SelectItem value="none" className="text-white">No Sorting</SelectItem>
                   {data.columns.map((column: string) => (
                     <SelectItem key={column} value={column} className="text-white">
                       {column}
@@ -270,9 +270,9 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                   setSortOrder(value);
                   setCurrentPage(1);
                 }}
-                disabled={!sortColumn}
+                disabled={sortColumn === "none"}
               >
-                <SelectTrigger className={`bg-slate-700 border-slate-600 text-white ${!sortColumn ? 'opacity-50' : ''}`}>
+                <SelectTrigger className={`bg-slate-700 border-slate-600 text-white ${sortColumn === "none" ? 'opacity-50' : ''}`}>
                   <SelectValue placeholder="Sort order" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
