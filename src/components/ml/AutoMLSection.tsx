@@ -3,9 +3,10 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Play, Download, BarChart3, TrendingUp, Target, Zap } from "lucide-react";
+import { Brain, Play, Download, BarChart3, TrendingUp, Target, Zap, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterPlot, Scatter } from "recharts";
+import BusinessInsights from "./BusinessInsights";
 
 interface AutoMLSectionProps {
   data: any;
@@ -16,6 +17,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
   const [selectedTask, setSelectedTask] = useState("");
   const [isTraining, setIsTraining] = useState(false);
   const [modelResults, setModelResults] = useState(null);
+  const [showInsights, setShowInsights] = useState(false);
   const { toast } = useToast();
 
   console.log("AutoMLSection component rendered with data:", data);
@@ -61,10 +63,10 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
         mse: selectedTask === "regression" ? 0.15 : null,
         crossValidationScore: 0.91,
         featureImportance: [
-          { feature: data.columns[0] || "Feature1", importance: 0.35 },
-          { feature: data.columns[1] || "Feature2", importance: 0.28 },
-          { feature: data.columns[2] || "Feature3", importance: 0.22 },
-          { feature: data.columns[3] || "Feature4", importance: 0.15 },
+          { feature: data.columns.filter((col: string) => col !== selectedTarget)[0] || "Feature1", importance: 0.35 },
+          { feature: data.columns.filter((col: string) => col !== selectedTarget)[1] || "Feature2", importance: 0.28 },
+          { feature: data.columns.filter((col: string) => col !== selectedTarget)[2] || "Feature3", importance: 0.22 },
+          { feature: data.columns.filter((col: string) => col !== selectedTarget)[3] || "Feature4", importance: 0.15 },
         ].filter(item => item.feature !== selectedTarget),
         confusionMatrix: selectedTask === "classification" ? [
           [45, 3],
@@ -98,6 +100,7 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
       };
 
       setModelResults(mockResults);
+      setShowInsights(true);
       toast({
         title: "Model Training Complete",
         description: `Best model: ${mockResults.bestModel} with ${(mockResults.crossValidationScore * 100).toFixed(1)}% CV score`,
@@ -220,9 +223,21 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                   <Target className="h-5 w-5" />
                   Model Performance Summary
                 </h3>
-                <Badge className="bg-green-600">
-                  Best: {modelResults.bestModel}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge className="bg-green-600">
+                    Best: {modelResults.bestModel}
+                  </Badge>
+                  {showInsights && (
+                    <Button
+                      onClick={() => setShowInsights(!showInsights)}
+                      size="sm"
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      <Lightbulb className="h-4 w-4 mr-1" />
+                      Business Insights
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -268,6 +283,16 @@ const AutoMLSection = ({ data }: AutoMLSectionProps) => {
                 </Button>
               </div>
             </div>
+
+            {/* Business Insights Section */}
+            {showInsights && (
+              <BusinessInsights 
+                modelResults={modelResults}
+                selectedTarget={selectedTarget}
+                selectedTask={selectedTask}
+                data={data}
+              />
+            )}
 
             {/* Model Comparison Chart */}
             <div className="bg-slate-700/30 rounded-lg p-6">
