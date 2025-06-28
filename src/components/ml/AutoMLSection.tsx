@@ -294,6 +294,28 @@ const AutoMLSection = ({
     return `${(value * 100).toFixed(decimals)}%`;
   };
 
+  // Prepare feature importance data for the chart
+  const prepareFeatureImportanceData = () => {
+    if (!autoMLState.modelResults?.featureImportance) {
+      console.log("No feature importance data available");
+      return [];
+    }
+
+    const data = autoMLState.modelResults.featureImportance.map((item: any) => ({
+      ...item,
+      // Ensure we have both feature and displayName
+      feature: item.feature || 'Unknown',
+      displayName: item.displayName || item.feature || 'Unknown',
+      // Ensure importance is a valid number
+      importance: typeof item.importance === 'number' && !isNaN(item.importance) ? item.importance : 0
+    }));
+
+    console.log("Prepared feature importance data for chart:", data);
+    return data;
+  };
+
+  const featureImportanceChartData = prepareFeatureImportanceData();
+
   return (
     <>
       <CardHeader>
@@ -700,63 +722,75 @@ const AutoMLSection = ({
                 {/* Debug information */}
                 {process.env.NODE_ENV === 'development' && (
                   <div className="mb-4 p-2 bg-slate-600/30 rounded text-xs text-gray-400">
-                    Debug: {autoMLState.modelResults.featureImportance?.length || 0} features loaded
+                    Debug: {featureImportanceChartData.length} features loaded
+                    {featureImportanceChartData.length > 0 && (
+                      <div>Sample: {JSON.stringify(featureImportanceChartData[0])}</div>
+                    )}
                   </div>
                 )}
                 
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      data={autoMLState.modelResults.featureImportance || []} 
-                      layout="horizontal"
-                      margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis 
-                        type="number" 
-                        stroke="#9CA3AF" 
-                        fontSize={12}
-                        domain={[0, 'dataMax']}
-                        tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-                      />
-                      <YAxis 
-                        type="category" 
-                        dataKey="displayName"
-                        stroke="#9CA3AF" 
-                        fontSize={11}
-                        width={75}
-                        tick={{ fontSize: 11 }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1F2937', 
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          color: '#F9FAFB'
-                        }}
-                        formatter={(value: any, name: any, props: any) => [
-                          `${(value * 100).toFixed(1)}%`, 
-                          'Importance',
-                          props.payload.feature // Show full feature name in tooltip
-                        ]}
-                        labelFormatter={(label: any, payload: any) => {
-                          return payload && payload[0] ? `Feature: ${payload[0].payload.feature}` : label;
-                        }}
-                      />
-                      <Bar 
-                        dataKey="importance" 
-                        fill="#8B5CF6"
-                        radius={[0, 4, 4, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                {featureImportanceChartData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={featureImportanceChartData} 
+                        layout="horizontal"
+                        margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis 
+                          type="number" 
+                          stroke="#9CA3AF" 
+                          fontSize={12}
+                          domain={[0, 'dataMax']}
+                          tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                        />
+                        <YAxis 
+                          type="category" 
+                          dataKey="displayName"
+                          stroke="#9CA3AF" 
+                          fontSize={11}
+                          width={75}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937', 
+                            border: '1px solid #374151',
+                            borderRadius: '8px',
+                            color: '#F9FAFB'
+                          }}
+                          formatter={(value: any, name: any, props: any) => [
+                            `${(value * 100).toFixed(1)}%`, 
+                            'Importance'
+                          ]}
+                          labelFormatter={(label: any, payload: any) => {
+                            return payload && payload[0] ? `Feature: ${payload[0].payload.feature}` : label;
+                          }}
+                        />
+                        <Bar 
+                          dataKey="importance" 
+                          fill="#8B5CF6"
+                          radius={[0, 4, 4, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No feature importance data available</p>
+                      <p className="text-sm mt-2">Train a model to see feature importance</p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Feature Importance List */}
                 <div className="mt-4 space-y-2">
                   <h4 className="text-sm text-gray-400 font-medium">Top Features:</h4>
-                  {autoMLState.modelResults.featureImportance && autoMLState.modelResults.featureImportance.length > 0 ? (
-                    autoMLState.modelResults.featureImportance.slice(0, 5).map((item: any, index: number) => (
+                  {featureImportanceChartData.length > 0 ? (
+                    featureImportanceChartData.slice(0, 5).map((item: any, index: number) => (
                       <div key={index} className="flex items-center justify-between bg-slate-600/30 rounded px-3 py-2">
                         <span className="text-white text-sm" title={item.feature}>
                           {item.displayName || item.feature}
