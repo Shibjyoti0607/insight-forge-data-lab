@@ -28,13 +28,15 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
     console.log("Email login attempted:", email);
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        // Handle specific authentication errors
+        // Handle specific authentication errors with more detailed logging
+        console.log("Authentication error handled:", error.message);
+        
         if (error.message.includes('Invalid login credentials')) {
           toast({
             title: "Login Failed",
@@ -49,22 +51,35 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
             description: "Please check your email and click the verification link before signing in.",
             variant: "destructive",
           });
+        } else if (error.message.includes('Too many requests')) {
+          toast({
+            title: "Too Many Attempts",
+            description: "Please wait a moment before trying again.",
+            variant: "destructive",
+          });
         } else {
-          throw error;
+          toast({
+            title: "Login Failed",
+            description: error.message || "Please check your credentials and try again.",
+            variant: "destructive",
+          });
         }
         return;
       }
 
+      // Successful login
+      console.log("Login successful for user:", data.user?.email);
       toast({
         title: "Login Successful",
         description: "Welcome to AI DataLab!",
       });
       onAuthSuccess();
     } catch (error: any) {
-      console.error("Login error:", error);
+      // This catch block handles unexpected errors
+      console.error("Unexpected login error:", error);
       toast({
         title: "Login Failed",
-        description: error.message || "Please check your credentials and try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -95,7 +110,7 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
     console.log("Sign up attempted:", email);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -104,6 +119,8 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
       });
 
       if (error) {
+        console.log("Sign up error handled:", error.message);
+        
         if (error.message.includes('User already registered')) {
           toast({
             title: "Account Already Exists",
@@ -111,12 +128,24 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
             variant: "destructive",
           });
           setShowSignUp(false);
+        } else if (error.message.includes('Password should be at least')) {
+          toast({
+            title: "Password Requirements",
+            description: "Password must meet the minimum requirements. Please try a stronger password.",
+            variant: "destructive",
+          });
         } else {
-          throw error;
+          toast({
+            title: "Sign Up Failed",
+            description: error.message || "Please try again.",
+            variant: "destructive",
+          });
         }
         return;
       }
 
+      // Successful signup
+      console.log("Sign up successful for user:", data.user?.email);
       toast({
         title: "Account Created Successfully",
         description: "Please check your email and click the verification link to complete your registration, then return here to sign in.",
@@ -125,10 +154,11 @@ const AuthSection = ({ onAuthSuccess }: AuthSectionProps) => {
       // Switch back to sign in mode after successful signup
       setShowSignUp(false);
     } catch (error: any) {
-      console.error("Sign up error:", error);
+      // This catch block handles unexpected errors
+      console.error("Unexpected sign up error:", error);
       toast({
         title: "Sign Up Failed",
-        description: error.message || "Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
