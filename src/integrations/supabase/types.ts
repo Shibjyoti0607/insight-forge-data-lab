@@ -41,6 +41,56 @@ export type Database = {
           }
         ]
       }
+      ml_results: {
+        Row: {
+          id: string
+          user_id: string
+          model_name: string
+          target_column: string
+          task_type: string
+          model_results: Json
+          feature_importance: Json | null
+          model_comparison: Json | null
+          training_config: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          model_name: string
+          target_column: string
+          task_type: string
+          model_results: Json
+          feature_importance?: Json | null
+          model_comparison?: Json | null
+          training_config?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          model_name?: string
+          target_column?: string
+          task_type?: string
+          model_results?: Json
+          feature_importance?: Json | null
+          model_comparison?: Json | null
+          training_config?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ml_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

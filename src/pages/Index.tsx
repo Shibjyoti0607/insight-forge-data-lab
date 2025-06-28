@@ -8,7 +8,7 @@ import DataPreview from "@/components/data/DataPreview";
 import DataCleaning from "@/components/data/DataCleaning";
 import AutoMLSection from "@/components/ml/AutoMLSection";
 import DashboardHeader from "@/components/layout/DashboardHeader";
-import { Database, Upload, Settings, Brain, BarChart3, Loader2 } from "lucide-react";
+import { Database, Upload, Settings, Brain, BarChart3, Loader2, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,6 +20,7 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [mlResults, setMlResults] = useState<any[]>([]);
   const { toast } = useToast();
   
   // AutoML state that persists across tab switches
@@ -36,6 +37,7 @@ const Index = () => {
   console.log("User ID:", userId);
   console.log("Uploaded data:", uploadedData ? "Present" : "None");
   console.log("AutoML state:", autoMLState);
+  console.log("ML Results:", mlResults);
 
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (userIdToFetch: string) => {
@@ -79,6 +81,108 @@ const Index = () => {
         description: "Failed to load your saved data. Please try refreshing the page.",
         variant: "destructive",
       });
+    }
+  }, [toast]);
+
+  // Fetch ML results from Supabase
+  const fetchMLResults = useCallback(async (userIdToFetch: string) => {
+    if (!userIdToFetch) return;
+
+    try {
+      console.log("Fetching ML results for:", userIdToFetch);
+      const { data, error } = await supabase
+        .from('ml_results')
+        .select('*')
+        .eq('user_id', userIdToFetch)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        console.log("ML results fetched successfully:", data.length, "results");
+        setMlResults(data);
+        
+        // Restore the most recent model results to autoML state if it matches current target
+        const latestResult = data[0];
+        if (latestResult && autoMLState.selectedTarget === latestResult.target_column) {
+          setAutoMLState(prev => ({
+            ...prev,
+            selectedTask: latestResult.task_type,
+            modelResults: latestResult.model_results,
+            showInsights: true
+          }));
+          console.log("Restored latest ML results to autoML state");
+        }
+      } else {
+        console.log("No ML results found for user");
+        setMlResults([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching ML results:", error);
+      toast({
+        title: "ML Results Loading Error",
+        description: "Failed to load your saved ML results.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, autoMLState.selectedTarget]);
+
+  // Save ML results to Supabase
+  const saveMLResults = useCallback(async (
+    userIdToSave: string, 
+    modelName: string,
+    targetColumn: string,
+    taskType: string,
+    modelResults: any,
+    trainingConfig: any
+  ) => {
+    if (!userIdToSave || !modelResults) return;
+
+    try {
+      setIsSaving(true);
+      console.log("Saving ML results for:", userIdToSave);
+      
+      const mlResultData = {
+        user_id: userIdToSave,
+        model_name: modelName,
+        target_column: targetColumn,
+        task_type: taskType,
+        model_results: modelResults,
+        feature_importance: modelResults.featureImportance || null,
+        model_comparison: modelResults.modelComparison || null,
+        training_config: trainingConfig
+      };
+
+      const { data, error } = await supabase
+        .from('ml_results')
+        .insert(mlResultData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log("ML results saved successfully:", data);
+      
+      // Update local ML results list
+      setMlResults(prev => [data, ...prev]);
+      
+      toast({
+        title: "ML Results Saved",
+        description: `${modelName} model results saved successfully to your account.`,
+      });
+
+      return data;
+    } catch (error: any) {
+      console.error("Error saving ML results:", error);
+      toast({
+        title: "Save Error",
+        description: "Failed to save ML results. Your model may be lost if you refresh the page.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   }, [toast]);
 
@@ -131,6 +235,7 @@ const Index = () => {
           setIsAuthenticated(true);
           setUserId(session.user.id);
           await fetchUserData(session.user.id);
+          await fetchMLResults(session.user.id);
         } else {
           console.log("No existing session found");
         }
@@ -142,7 +247,7 @@ const Index = () => {
     };
 
     checkSession();
-  }, [fetchUserData]);
+  }, [fetchUserData, fetchMLResults]);
 
   // Save data whenever uploadedData or cleanedData changes
   useEffect(() => {
@@ -171,6 +276,7 @@ const Index = () => {
         setIsAuthenticated(true);
         setUserId(session.user.id);
         await fetchUserData(session.user.id);
+        await fetchMLResults(session.user.id);
       }
     } catch (error) {
       console.error("Error handling auth success:", error);
@@ -193,6 +299,7 @@ const Index = () => {
       setUserId(null);
       setUploadedData(null);
       setCleanedData(null);
+      setMlResults([]);
       setActiveTab("upload");
       setAutoMLState({
         selectedTarget: "",
@@ -210,6 +317,38 @@ const Index = () => {
       console.error("Error during logout:", error);
     }
   };
+
+  // Handle ML model training completion
+  const handleMLTrainingComplete = useCallback(async (
+    modelName: string,
+    targetColumn: string,
+    taskType: string,
+    modelResults: any,
+    trainingConfig: any
+  ) => {
+    if (userId) {
+      await saveMLResults(userId, modelName, targetColumn, taskType, modelResults, trainingConfig);
+    }
+  }, [userId, saveMLResults]);
+
+  // Load previous ML result
+  const loadMLResult = useCallback((mlResult: any) => {
+    setAutoMLState({
+      selectedTarget: mlResult.target_column,
+      selectedTask: mlResult.task_type,
+      isTraining: false,
+      modelResults: mlResult.model_results,
+      showInsights: true
+    });
+    
+    // Switch to ML tab
+    setActiveTab("ml");
+    
+    toast({
+      title: "ML Results Loaded",
+      description: `Loaded ${mlResult.model_name} model results from ${new Date(mlResult.created_at).toLocaleDateString()}`,
+    });
+  }, [toast]);
 
   // Show loading spinner while checking session
   if (isLoading) {
@@ -254,12 +393,20 @@ const Index = () => {
                 Upload, clean, and analyze your data with AI-powered tools
               </p>
             </div>
-            {isSaving && (
-              <div className="flex items-center gap-2 text-purple-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Saving...</span>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {isSaving && (
+                <div className="flex items-center gap-2 text-purple-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Saving...</span>
+                </div>
+              )}
+              {mlResults.length > 0 && (
+                <div className="flex items-center gap-2 text-green-400">
+                  <History className="h-4 w-4" />
+                  <span className="text-sm">{mlResults.length} saved models</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -301,7 +448,7 @@ const Index = () => {
             >
               <Brain className="h-4 w-4" />
               <span className="hidden sm:inline">AutoML</span>
-              {autoMLState.modelResults && (
+              {(autoMLState.modelResults || mlResults.length > 0) && (
                 <div className="w-2 h-2 bg-green-400 rounded-full ml-1"></div>
               )}
             </TabsTrigger>
@@ -334,6 +481,9 @@ const Index = () => {
                 data={cleanedData || uploadedData}
                 autoMLState={autoMLState}
                 setAutoMLState={setAutoMLState}
+                onTrainingComplete={handleMLTrainingComplete}
+                mlResults={mlResults}
+                onLoadMLResult={loadMLResult}
               />
             </Card>
           </TabsContent>

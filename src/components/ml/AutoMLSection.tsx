@@ -2,10 +2,11 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Play, Download, BarChart3, TrendingUp, Target, Zap, Lightbulb } from "lucide-react";
+import { Brain, Play, Download, BarChart3, TrendingUp, Target, Zap, Lightbulb, History, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterPlot, Scatter } from "recharts";
 import BusinessInsights from "./BusinessInsights";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AutoMLSectionProps {
   data: any;
@@ -17,13 +18,24 @@ interface AutoMLSectionProps {
     showInsights: boolean;
   };
   setAutoMLState: (state: any) => void;
+  onTrainingComplete?: (modelName: string, targetColumn: string, taskType: string, modelResults: any, trainingConfig: any) => void;
+  mlResults?: any[];
+  onLoadMLResult?: (mlResult: any) => void;
 }
 
-const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps) => {
+const AutoMLSection = ({ 
+  data, 
+  autoMLState, 
+  setAutoMLState, 
+  onTrainingComplete,
+  mlResults = [],
+  onLoadMLResult
+}: AutoMLSectionProps) => {
   const { toast } = useToast();
 
   console.log("AutoMLSection component rendered with data:", data);
   console.log("AutoML state:", autoMLState);
+  console.log("ML Results:", mlResults);
 
   if (!data) {
     return (
@@ -125,7 +137,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
     }
 
     // Simulate ML model training
-    setTimeout(() => {
+    setTimeout(async () => {
       // Create realistic feature importance data based on actual feature columns
       const featureImportanceData = featureColumns.slice(0, Math.min(8, featureColumns.length)).map((col, index) => {
         // Generate realistic importance values that sum to approximately 1
@@ -141,8 +153,10 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
         };
       }).sort((a, b) => b.importance - a.importance); // Sort by importance descending
 
+      const bestModelName = autoMLState.selectedTask === "classification" ? "Random Forest" : "Linear Regression";
+      
       const mockResults = {
-        bestModel: autoMLState.selectedTask === "classification" ? "Random Forest" : "Linear Regression",
+        bestModel: bestModelName,
         accuracy: autoMLState.selectedTask === "classification" ? 0.94 : null,
         r2Score: autoMLState.selectedTask === "regression" ? 0.87 : null,
         mse: autoMLState.selectedTask === "regression" ? 0.15 : null,
@@ -191,11 +205,61 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
         isTraining: false
       }));
 
+      // Save to backend if callback is provided
+      if (onTrainingComplete) {
+        const trainingConfig = {
+          selectedTarget: autoMLState.selectedTarget,
+          selectedTask: autoMLState.selectedTask,
+          usedFeatures: featureColumns,
+          excludedColumns: data.columns.filter((col: string) => !featureColumns.includes(col) && col !== autoMLState.selectedTarget),
+          datasetInfo: {
+            totalRows: data.statistics.totalRows,
+            totalColumns: data.statistics.totalColumns,
+            missingValues: data.statistics.missingValues,
+            filename: data.filename
+          }
+        };
+
+        await onTrainingComplete(
+          bestModelName,
+          autoMLState.selectedTarget,
+          autoMLState.selectedTask,
+          mockResults,
+          trainingConfig
+        );
+      }
+
       toast({
         title: "Model Training Complete",
         description: `Best model: ${mockResults.bestModel} with ${(mockResults.crossValidationScore * 100).toFixed(1)}% CV score using ${featureColumns.length} features`,
       });
     }, 3000);
+  };
+
+  const handleDeleteMLResult = async (mlResultId: string) => {
+    try {
+      const { error } = await supabase
+        .from('ml_results')
+        .delete()
+        .eq('id', mlResultId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Model Deleted",
+        description: "ML model results have been deleted successfully.",
+      });
+
+      // Refresh the page or update the mlResults list
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error deleting ML result:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the ML model results.",
+        variant: "destructive",
+      });
+    }
   };
 
   const classificationAlgorithms = [
@@ -241,6 +305,11 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
               Model Trained
             </Badge>
           )}
+          {mlResults.length > 0 && (
+            <Badge className="bg-blue-600 text-white ml-2">
+              {mlResults.length} Saved Models
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription className="text-gray-400">
           Automatic model selection and hyperparameter tuning
@@ -252,6 +321,69 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Previous ML Results Section */}
+        {mlResults.length > 0 && (
+          <div className="bg-slate-700/30 rounded-lg p-6 border border-slate-600">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="h-5 w-5 text-blue-400" />
+              <h3 className="text-white font-semibold">Previous ML Results</h3>
+              <Badge className="bg-blue-600 text-white">
+                {mlResults.length} saved
+              </Badge>
+            </div>
+            
+            <div className="grid gap-3 max-h-60 overflow-y-auto">
+              {mlResults.map((result) => (
+                <div key={result.id} className="bg-slate-600/50 rounded-lg p-4 border border-slate-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-white font-medium">{result.model_name}</h4>
+                        <Badge className={`text-xs ${
+                          result.task_type === 'classification' ? 'bg-blue-600' : 'bg-green-600'
+                        }`}>
+                          {result.task_type}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-300 space-y-1">
+                        <div>Target: <span className="text-blue-400">{result.target_column}</span></div>
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(result.created_at).toLocaleDateString()}
+                          </span>
+                          {result.model_results?.crossValidationScore && (
+                            <span className="text-green-400">
+                              CV: {(result.model_results.crossValidationScore * 100).toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => onLoadMLResult && onLoadMLResult(result)}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Load
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteMLResult(result.id)}
+                        className="border-red-600 text-red-400 hover:bg-red-600/20"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
