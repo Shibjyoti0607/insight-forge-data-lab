@@ -200,6 +200,22 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
   const availableFeatures = autoMLState.selectedTarget ? getFeatureColumns(data.columns, autoMLState.selectedTarget) : [];
   const excludedColumns = autoMLState.selectedTarget ? data.columns.filter((col: string) => !availableFeatures.includes(col) && col !== autoMLState.selectedTarget) : [];
 
+  // Helper function to safely format numbers
+  const safeToFixed = (value: number | null | undefined, decimals: number = 1): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return 'N/A';
+    }
+    return value.toFixed(decimals);
+  };
+
+  // Helper function to safely format percentages
+  const safePercentage = (value: number | null | undefined, decimals: number = 1): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return 'N/A';
+    }
+    return `${(value * 100).toFixed(decimals)}%`;
+  };
+
   return (
     <>
       <CardHeader>
@@ -414,7 +430,7 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">Accuracy</p>
                     <p className="text-xl font-bold text-white">
-                      {(autoMLState.modelResults.accuracy * 100).toFixed(1)}%
+                      {safePercentage(autoMLState.modelResults.accuracy)}
                     </p>
                   </div>
                 )}
@@ -422,21 +438,21 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">R² Score</p>
                     <p className="text-xl font-bold text-white">
-                      {autoMLState.modelResults.r2Score.toFixed(3)}
+                      {safeToFixed(autoMLState.modelResults.r2Score, 3)}
                     </p>
                   </div>
                 )}
                 <div className="bg-slate-700/50 p-3 rounded-lg">
                   <p className="text-sm text-gray-400">CV Score</p>
                   <p className="text-xl font-bold text-white">
-                    {(autoMLState.modelResults.crossValidationScore * 100).toFixed(1)}%
+                    {safePercentage(autoMLState.modelResults.crossValidationScore)}
                   </p>
                 </div>
                 {autoMLState.modelResults.mse && (
                   <div className="bg-slate-700/50 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">MSE</p>
                     <p className="text-xl font-bold text-white">
-                      {autoMLState.modelResults.mse.toFixed(3)}
+                      {safeToFixed(autoMLState.modelResults.mse, 3)}
                     </p>
                   </div>
                 )}
@@ -448,11 +464,11 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-gray-400">Features Used:</span>
-                    <span className="text-green-400 font-medium ml-2">{autoMLState.modelResults.usedFeatures.length}</span>
+                    <span className="text-green-400 font-medium ml-2">{autoMLState.modelResults.usedFeatures?.length || 0}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">Columns Excluded:</span>
-                    <span className="text-red-400 font-medium ml-2">{autoMLState.modelResults.excludedColumns.length}</span>
+                    <span className="text-red-400 font-medium ml-2">{autoMLState.modelResults.excludedColumns?.length || 0}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">Target Variable:</span>
@@ -632,19 +648,22 @@ const AutoMLSection = ({ data, autoMLState, setAutoMLState }: AutoMLSectionProps
                         <td className="p-3 text-white font-medium">{model.model}</td>
                         {autoMLState.selectedTask === "classification" ? (
                           <>
-                            <td className="p-3 text-gray-400">{(model.accuracy * 100).toFixed(1)}%</td>
-                            <td className="p-3 text-gray-400">{(model.precision * 100).toFixed(1)}%</td>
-                            <td className="p-3 text-gray-400">{(model.recall * 100).toFixed(1)}%</td>
+                            <td className="p-3 text-gray-400">{safePercentage(model.accuracy)}</td>
+                            <td className="p-3 text-gray-400">{safePercentage(model.precision)}</td>
+                            <td className="p-3 text-gray-400">{safePercentage(model.recall)}</td>
                             <td className="p-3 text-gray-400">
-                              {(2 * model.precision * model.recall / (model.precision + model.recall) * 100).toFixed(1)}%
+                              {model.precision && model.recall ? 
+                                safePercentage(2 * model.precision * model.recall / (model.precision + model.recall)) : 
+                                'N/A'
+                              }
                             </td>
                           </>
                         ) : (
                           <>
-                            <td className="p-3 text-gray-400">{model.r2.toFixed(3)}</td>
-                            <td className="p-3 text-gray-400">{model.mse.toFixed(3)}</td>
-                            <td className="p-3 text-gray-400">{model.mae.toFixed(3)}</td>
-                            <td className="p-3 text-gray-400">{Math.sqrt(model.mse).toFixed(3)}</td>
+                            <td className="p-3 text-gray-400">{safeToFixed(model.r2, 3)}</td>
+                            <td className="p-3 text-gray-400">{safeToFixed(model.mse, 3)}</td>
+                            <td className="p-3 text-gray-400">{safeToFixed(model.mae, 3)}</td>
+                            <td className="p-3 text-gray-400">{model.mse ? safeToFixed(Math.sqrt(model.mse), 3) : 'N/A'}</td>
                           </>
                         )}
                         <td className="p-3">
