@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Database, BarChart3, Search, Filter, X } from "lucide-react";
+import { Database, BarChart3, Search, Filter, X, ArrowUpDown } from "lucide-react";
 
 interface DataPreviewProps {
   data: any;
@@ -14,6 +14,8 @@ const DataPreview = ({ data }: DataPreviewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedColumn, setSelectedColumn] = useState("all");
   const [selectedDataType, setSelectedDataType] = useState("all");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortColumn, setSortColumn] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 20;
 
@@ -39,7 +41,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
   }
 
   // Filter data based on search term and selected filters
-  const filteredRows = data.rows.filter((row: any) => {
+  let filteredRows = data.rows.filter((row: any) => {
     // Data type filter - check if row has columns of the selected type
     if (selectedDataType !== "all") {
       const hasColumnOfType = data.columns.some((column: string) => 
@@ -75,6 +77,37 @@ const DataPreview = ({ data }: DataPreviewProps) => {
     return true;
   });
 
+  // Sort data if a sort column is selected
+  if (sortColumn && data.columns.includes(sortColumn)) {
+    filteredRows = [...filteredRows].sort((a, b) => {
+      const aValue = a[sortColumn];
+      const bValue = b[sortColumn];
+      
+      // Handle null/undefined values
+      if (aValue === null || aValue === undefined) return sortOrder === "asc" ? 1 : -1;
+      if (bValue === null || bValue === undefined) return sortOrder === "asc" ? -1 : 1;
+      
+      // Convert to strings for comparison
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+      
+      // Check if values are numeric
+      const aNum = parseFloat(aValue);
+      const bNum = parseFloat(bValue);
+      const isNumeric = !isNaN(aNum) && !isNaN(bNum);
+      
+      if (isNumeric) {
+        return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
+      } else {
+        if (sortOrder === "asc") {
+          return aStr.localeCompare(bStr);
+        } else {
+          return bStr.localeCompare(aStr);
+        }
+      }
+    });
+  }
+
   // Pagination
   const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -87,6 +120,8 @@ const DataPreview = ({ data }: DataPreviewProps) => {
     setSearchTerm("");
     setSelectedColumn("all");
     setSelectedDataType("all");
+    setSortColumn("");
+    setSortOrder("asc");
     setCurrentPage(1);
   };
 
@@ -99,6 +134,11 @@ const DataPreview = ({ data }: DataPreviewProps) => {
         </CardTitle>
         <CardDescription className="text-gray-400">
           {data.filename} • {filteredRows.length} of {data.statistics.totalRows} rows × {data.statistics.totalColumns} columns
+          {sortColumn && (
+            <span className="ml-2 text-purple-400">
+              • Sorted by {sortColumn} ({sortOrder === "asc" ? "Ascending" : "Descending"})
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -127,7 +167,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-4 w-4 text-gray-400" />
             <h3 className="text-white font-semibold">Filters</h3>
-            {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all") && (
+            {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all" || sortColumn) && (
               <Button
                 onClick={clearFilters}
                 size="sm"
@@ -140,7 +180,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search Filter */}
             <div className="space-y-2">
               <label className="text-sm text-gray-400">Search Data</label>
@@ -199,6 +239,58 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Sort Column */}
+            <div className="space-y-2">
+              <label className="text-sm text-gray-400">Sort by Column</label>
+              <Select value={sortColumn} onValueChange={(value) => {
+                setSortColumn(value);
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Select column to sort" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="" className="text-white">No Sorting</SelectItem>
+                  {data.columns.map((column: string) => (
+                    <SelectItem key={column} value={column} className="text-white">
+                      {column}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort Order */}
+            <div className="space-y-2">
+              <label className="text-sm text-gray-400">Sort Order</label>
+              <Select 
+                value={sortOrder} 
+                onValueChange={(value) => {
+                  setSortOrder(value);
+                  setCurrentPage(1);
+                }}
+                disabled={!sortColumn}
+              >
+                <SelectTrigger className={`bg-slate-700 border-slate-600 text-white ${!sortColumn ? 'opacity-50' : ''}`}>
+                  <SelectValue placeholder="Sort order" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="asc" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="h-4 w-4" />
+                      Ascending
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="desc" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="h-4 w-4 rotate-180" />
+                      Descending
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -216,6 +308,8 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                 className={`cursor-pointer transition-colors ${
                   selectedColumn === column 
                     ? "bg-purple-600 text-white" 
+                    : sortColumn === column
+                    ? "bg-blue-600 text-white"
                     : "bg-slate-700 text-gray-300 hover:bg-slate-600"
                 }`}
                 onClick={() => {
@@ -224,6 +318,9 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                 }}
               >
                 {column}: {type as string}
+                {sortColumn === column && (
+                  <ArrowUpDown className={`h-3 w-3 ml-1 ${sortOrder === "desc" ? "rotate-180" : ""}`} />
+                )}
               </Badge>
             ))}
           </div>
@@ -247,10 +344,19 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                       <th 
                         key={index} 
                         className={`text-left p-3 font-medium cursor-pointer hover:bg-slate-700 transition-colors ${
-                          selectedColumn === column ? "text-purple-400 bg-slate-700" : "text-gray-300"
+                          selectedColumn === column ? "text-purple-400 bg-slate-700" : 
+                          sortColumn === column ? "text-blue-400 bg-slate-700" :
+                          "text-gray-300"
                         }`}
                         onClick={() => {
-                          setSelectedColumn(selectedColumn === column ? "all" : column);
+                          if (sortColumn === column) {
+                            // If already sorting by this column, toggle sort order
+                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                          } else {
+                            // Set new sort column and default to ascending
+                            setSortColumn(column);
+                            setSortOrder("asc");
+                          }
                           setCurrentPage(1);
                         }}
                       >
@@ -262,6 +368,9 @@ const DataPreview = ({ data }: DataPreviewProps) => {
                           >
                             {data.statistics.dataTypes[column]}
                           </Badge>
+                          {sortColumn === column && (
+                            <ArrowUpDown className={`h-3 w-3 ${sortOrder === "desc" ? "rotate-180" : ""}`} />
+                          )}
                         </div>
                       </th>
                     ))}
