@@ -9,87 +9,71 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      user_data: {
-        Row: {
-          id: string
-          uploaded_data: Json | null
-          cleaned_data: Json | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          uploaded_data?: Json | null
-          cleaned_data?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          uploaded_data?: Json | null
-          cleaned_data?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_data_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       ml_results: {
         Row: {
+          created_at: string | null
+          feature_importance: Json | null
           id: string
-          user_id: string
+          model_comparison: Json | null
           model_name: string
+          model_results: Json
           target_column: string
           task_type: string
-          model_results: Json
-          feature_importance: Json | null
-          model_comparison: Json | null
           training_config: Json | null
-          created_at: string
-          updated_at: string
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
+          created_at?: string | null
+          feature_importance?: Json | null
           id?: string
-          user_id: string
+          model_comparison?: Json | null
           model_name: string
+          model_results: Json
           target_column: string
           task_type: string
-          model_results: Json
-          feature_importance?: Json | null
-          model_comparison?: Json | null
           training_config?: Json | null
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
+          created_at?: string | null
+          feature_importance?: Json | null
           id?: string
-          user_id?: string
+          model_comparison?: Json | null
           model_name?: string
+          model_results?: Json
           target_column?: string
           task_type?: string
-          model_results?: Json
-          feature_importance?: Json | null
-          model_comparison?: Json | null
           training_config?: Json | null
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ml_results_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
+      }
+      user_data: {
+        Row: {
+          cleaned_data: Json | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          uploaded_data: Json | null
+        }
+        Insert: {
+          cleaned_data?: Json | null
+          created_at?: string | null
+          id: string
+          updated_at?: string | null
+          uploaded_data?: Json | null
+        }
+        Update: {
+          cleaned_data?: Json | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          uploaded_data?: Json | null
+        }
+        Relationships: []
       }
     }
     Views: {

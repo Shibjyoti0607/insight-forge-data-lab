@@ -9,9 +9,10 @@ import * as XLSX from "xlsx";
 
 interface DataUploadProps {
   onDataUploaded: (data: any) => void;
+  onDataCleared?: () => void;
 }
 
-const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
+const DataUpload = ({ onDataUploaded, onDataCleared }: DataUploadProps) => {
   const [dragActive, setDragActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +98,9 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
             size: file.size,
             columns,
             rows,
-            statistics
+            statistics,
+            originalRows: [...rows], // Store original data
+            isOriginal: true
           };
           
           resolve(parsedData);
@@ -148,7 +151,9 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
             size: file.size,
             columns: headers,
             rows: dataRows,
-            statistics
+            statistics,
+            originalRows: [...dataRows], // Store original data
+            isOriginal: true
           };
           
           resolve(parsedData);
@@ -201,7 +206,9 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
             size: file.size,
             columns: headers,
             rows: dataRows,
-            statistics
+            statistics,
+            originalRows: [...dataRows], // Store original data
+            isOriginal: true
           };
           
           resolve(parsedData);
@@ -221,6 +228,11 @@ const DataUpload = ({ onDataUploaded }: DataUploadProps) => {
 
     console.log("Processing file:", file.name, file.type, file.size);
     setIsProcessing(true);
+
+    // Clear previous data first
+    if (onDataCleared) {
+      onDataCleared();
+    }
 
     try {
       let parsedData;

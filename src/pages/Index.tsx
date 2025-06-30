@@ -39,6 +39,47 @@ const Index = () => {
   console.log("AutoML state:", autoMLState);
   console.log("ML Results:", mlResults);
 
+  // Handle data upload with proper state clearing
+  const handleDataUploaded = useCallback((data: any) => {
+    console.log("New data uploaded, clearing previous states");
+    
+    // Clear all previous data states
+    setUploadedData(data);
+    setCleanedData(null);
+    
+    // Reset AutoML state
+    setAutoMLState({
+      selectedTarget: "",
+      selectedTask: "",
+      isTraining: false,
+      modelResults: null,
+      showInsights: false
+    });
+    
+    // Switch to preview tab to show the new data
+    setActiveTab("preview");
+  }, []);
+
+  // Handle data clearing
+  const handleDataCleared = useCallback(() => {
+    console.log("Clearing all data states");
+    setUploadedData(null);
+    setCleanedData(null);
+    setAutoMLState({
+      selectedTarget: "",
+      selectedTask: "",
+      isTraining: false,
+      modelResults: null,
+      showInsights: false
+    });
+  }, []);
+
+  // Handle cleaned data update
+  const handleDataCleaned = useCallback((cleanedDataResult: any) => {
+    console.log("Data cleaned, updating state");
+    setCleanedData(cleanedDataResult);
+  }, []);
+
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (userIdToFetch: string) => {
     if (!userIdToFetch) return;
@@ -456,7 +497,10 @@ const Index = () => {
 
           <TabsContent value="upload" className="space-y-6">
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-              <DataUpload onDataUploaded={setUploadedData} />
+              <DataUpload 
+                onDataUploaded={handleDataUploaded} 
+                onDataCleared={handleDataCleared}
+              />
             </Card>
           </TabsContent>
 
@@ -470,7 +514,7 @@ const Index = () => {
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
               <DataCleaning 
                 data={uploadedData} 
-                onDataCleaned={setCleanedData}
+                onDataCleaned={handleDataCleaned}
               />
             </Card>
           </TabsContent>
