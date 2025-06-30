@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Brain, Play, Download, BarChart3, TrendingUp, Target, Zap, Lightbulb, History, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterPlot, Scatter } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Scatter } from "recharts";
 import BusinessInsights from "./BusinessInsights";
 import { supabase } from "@/integrations/supabase/client";
 
