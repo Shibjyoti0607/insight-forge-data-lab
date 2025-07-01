@@ -1,10 +1,11 @@
+
 import { useState } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Database, BarChart3, Search, Filter, X, ArrowUpDown } from "lucide-react";
+import { Database, BarChart3, Search, Filter, X, ArrowUpDown, Eye, EyeOff } from "lucide-react";
 
 interface DataPreviewProps {
   data: any;
@@ -17,6 +18,7 @@ const DataPreview = ({ data }: DataPreviewProps) => {
   const [sortOrder, setSortOrder] = useState("asc");
   const [sortColumn, setSortColumn] = useState("none");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDataTable, setShowDataTable] = useState(false);
   const rowsPerPage = 20;
 
   console.log("DataPreview component rendered with data:", data);
@@ -162,138 +164,6 @@ const DataPreview = ({ data }: DataPreviewProps) => {
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <h3 className="text-white font-semibold">Filters</h3>
-            {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all" || sortColumn !== "none") && (
-              <Button
-                onClick={clearFilters}
-                size="sm"
-                variant="outline"
-                className="ml-auto border-slate-600 text-gray-300 hover:bg-slate-700"
-              >
-                <X className="h-3 w-3 mr-1" />
-                Clear
-              </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search Filter */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Search Data</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder={selectedColumn !== "all" ? `Search in ${selectedColumn}...` : "Search in all columns..."}
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="pl-10 bg-slate-700 border-slate-600 text-white placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-
-            {/* Column Filter */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Filter by Column</label>
-              <Select value={selectedColumn} onValueChange={(value) => {
-                setSelectedColumn(value);
-                setCurrentPage(1);
-              }}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Select column" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="all" className="text-white">All Columns</SelectItem>
-                  {data.columns.map((column: string) => (
-                    <SelectItem key={column} value={column} className="text-white">
-                      {column}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Data Type Filter */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Filter by Data Type</label>
-              <Select value={selectedDataType} onValueChange={(value) => {
-                setSelectedDataType(value);
-                setCurrentPage(1);
-              }}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Select data type" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="all" className="text-white">All Types</SelectItem>
-                  {uniqueDataTypes.map((type: string) => (
-                    <SelectItem key={type} value={type} className="text-white">
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Sort Column */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Sort by Column</label>
-              <Select value={sortColumn} onValueChange={(value) => {
-                setSortColumn(value);
-                setCurrentPage(1);
-              }}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Select column to sort" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="none" className="text-white">No Sorting</SelectItem>
-                  {data.columns.map((column: string) => (
-                    <SelectItem key={column} value={column} className="text-white">
-                      {column}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Sort Order */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Sort Order</label>
-              <Select 
-                value={sortOrder} 
-                onValueChange={(value) => {
-                  setSortOrder(value);
-                  setCurrentPage(1);
-                }}
-                disabled={sortColumn === "none"}
-              >
-                <SelectTrigger className={`bg-slate-700 border-slate-600 text-white ${sortColumn === "none" ? 'opacity-50' : ''}`}>
-                  <SelectValue placeholder="Sort order" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="asc" className="text-white">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-4 w-4" />
-                      Ascending
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="desc" className="text-white">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-4 w-4 rotate-180" />
-                      Descending
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
         {/* Column Types Display */}
         <div>
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
@@ -326,110 +196,268 @@ const DataPreview = ({ data }: DataPreviewProps) => {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-semibold">Data Sample</h3>
-            <div className="text-sm text-gray-400">
-              Showing {startIndex + 1}-{Math.min(startIndex + rowsPerPage, filteredRows.length)} of {filteredRows.length} rows
-            </div>
-          </div>
-          
-          <div className="bg-slate-700/30 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto max-h-96">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-800">
-                  <tr className="border-b border-slate-600">
-                    {data.columns.map((column: string, index: number) => (
-                      <th 
-                        key={index} 
-                        className={`text-left p-3 font-medium cursor-pointer hover:bg-slate-700 transition-colors ${
-                          selectedColumn === column ? "text-purple-400 bg-slate-700" : 
-                          sortColumn === column ? "text-blue-400 bg-slate-700" :
-                          "text-gray-300"
-                        }`}
-                        onClick={() => {
-                          if (sortColumn === column) {
-                            // If already sorting by this column, toggle sort order
-                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                          } else {
-                            // Set new sort column and default to ascending
-                            setSortColumn(column);
-                            setSortOrder("asc");
-                          }
-                          setCurrentPage(1);
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
+        {/* Data Table Toggle Button */}
+        <div className="flex items-center justify-center">
+          <Button
+            onClick={() => setShowDataTable(!showDataTable)}
+            variant="outline"
+            className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white"
+          >
+            {showDataTable ? (
+              <>
+                <EyeOff className="h-4 w-4 mr-2" />
+                Hide Data Table
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4 mr-2" />
+                Show Data Table
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Collapsible Data Table Section */}
+        {showDataTable && (
+          <>
+            {/* Filters Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Filter className="h-4 w-4 text-gray-400" />
+                <h3 className="text-white font-semibold">Filters</h3>
+                {(searchTerm || selectedColumn !== "all" || selectedDataType !== "all" || sortColumn !== "none") && (
+                  <Button
+                    onClick={clearFilters}
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto border-slate-600 text-gray-300 hover:bg-slate-700"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* Search Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Search Data</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder={selectedColumn !== "all" ? `Search in ${selectedColumn}...` : "Search in all columns..."}
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="pl-10 bg-slate-700 border-slate-600 text-white placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Column Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Filter by Column</label>
+                  <Select value={selectedColumn} onValueChange={(value) => {
+                    setSelectedColumn(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Select column" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="all" className="text-white">All Columns</SelectItem>
+                      {data.columns.map((column: string) => (
+                        <SelectItem key={column} value={column} className="text-white">
                           {column}
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs border-slate-500 text-slate-400"
-                          >
-                            {data.statistics.dataTypes[column]}
-                          </Badge>
-                          {sortColumn === column && (
-                            <ArrowUpDown className={`h-3 w-3 ${sortOrder === "desc" ? "rotate-180" : ""}`} />
-                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Data Type Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Filter by Data Type</label>
+                  <Select value={selectedDataType} onValueChange={(value) => {
+                    setSelectedDataType(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Select data type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="all" className="text-white">All Types</SelectItem>
+                      {uniqueDataTypes.map((type: string) => (
+                        <SelectItem key={type} value={type} className="text-white">
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sort Column */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Sort by Column</label>
+                  <Select value={sortColumn} onValueChange={(value) => {
+                    setSortColumn(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Select column to sort" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="none" className="text-white">No Sorting</SelectItem>
+                      {data.columns.map((column: string) => (
+                        <SelectItem key={column} value={column} className="text-white">
+                          {column}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sort Order */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400">Sort Order</label>
+                  <Select 
+                    value={sortOrder} 
+                    onValueChange={(value) => {
+                      setSortOrder(value);
+                      setCurrentPage(1);
+                    }}
+                    disabled={sortColumn === "none"}
+                  >
+                    <SelectTrigger className={`bg-slate-700 border-slate-600 text-white ${sortColumn === "none" ? 'opacity-50' : ''}`}>
+                      <SelectValue placeholder="Sort order" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="asc" className="text-white">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpDown className="h-4 w-4" />
+                          Ascending
                         </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRows.length > 0 ? (
-                    paginatedRows.map((row: any, rowIndex: number) => (
-                      <tr key={rowIndex} className="border-b border-slate-600/50 hover:bg-slate-700/30">
-                        {data.columns.map((column: string, cellIndex: number) => (
-                          <td key={cellIndex} className="p-3 text-gray-400 max-w-xs truncate">
-                            {row[column] !== null && row[column] !== undefined ? String(row[column]) : (
-                              <span className="text-slate-500 italic">null</span>
-                            )}
-                          </td>
+                      </SelectItem>
+                      <SelectItem value="desc" className="text-white">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpDown className="h-4 w-4 rotate-180" />
+                          Descending
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold">Data Sample</h3>
+                <div className="text-sm text-gray-400">
+                  Showing {startIndex + 1}-{Math.min(startIndex + rowsPerPage, filteredRows.length)} of {filteredRows.length} rows
+                </div>
+              </div>
+              
+              <div className="bg-slate-700/30 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-slate-800">
+                      <tr className="border-b border-slate-600">
+                        {data.columns.map((column: string, index: number) => (
+                          <th 
+                            key={index} 
+                            className={`text-left p-3 font-medium cursor-pointer hover:bg-slate-700 transition-colors ${
+                              selectedColumn === column ? "text-purple-400 bg-slate-700" : 
+                              sortColumn === column ? "text-blue-400 bg-slate-700" :
+                              "text-gray-300"
+                            }`}
+                            onClick={() => {
+                              if (sortColumn === column) {
+                                // If already sorting by this column, toggle sort order
+                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                // Set new sort column and default to ascending
+                                setSortColumn(column);
+                                setSortOrder("asc");
+                              }
+                              setCurrentPage(1);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              {column}
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs border-slate-500 text-slate-400"
+                              >
+                                {data.statistics.dataTypes[column]}
+                              </Badge>
+                              {sortColumn === column && (
+                                <ArrowUpDown className={`h-3 w-3 ${sortOrder === "desc" ? "rotate-180" : ""}`} />
+                              )}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={data.columns.length} className="p-8 text-center text-gray-500">
-                        No data matches the current filters
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </thead>
+                    <tbody>
+                      {paginatedRows.length > 0 ? (
+                        paginatedRows.map((row: any, rowIndex: number) => (
+                          <tr key={rowIndex} className="border-b border-slate-600/50 hover:bg-slate-700/30">
+                            {data.columns.map((column: string, cellIndex: number) => (
+                              <td key={cellIndex} className="p-3 text-gray-400 max-w-xs truncate">
+                                {row[column] !== null && row[column] !== undefined ? String(row[column]) : (
+                                  <span className="text-slate-500 italic">null</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={data.columns.length} className="p-8 text-center text-gray-500">
+                            No data matches the current filters
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-400">
-                Page {currentPage} of {totalPages}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  size="sm"
-                  variant="outline"
-                  className="border-slate-600 text-gray-300 hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Previous
-                </Button>
-                <Button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  size="sm"
-                  variant="outline"
-                  className="border-slate-600 text-gray-300 hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Next
-                </Button>
-              </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-400">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-600 text-gray-300 hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-600 text-gray-300 hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </CardContent>
     </>
   );
