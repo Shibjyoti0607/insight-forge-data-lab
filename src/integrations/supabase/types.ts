@@ -75,6 +75,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_datasets: {
+        Row: {
+          cleaned_data: Json | null
+          created_at: string
+          dataset_name: string
+          filename: string
+          id: string
+          updated_at: string
+          uploaded_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          cleaned_data?: Json | null
+          created_at?: string
+          dataset_name: string
+          filename: string
+          id?: string
+          updated_at?: string
+          uploaded_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          cleaned_data?: Json | null
+          created_at?: string
+          dataset_name?: string
+          filename?: string
+          id?: string
+          updated_at?: string
+          uploaded_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

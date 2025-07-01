@@ -36,8 +36,9 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
 
     try {
       setIsLoading(true);
+      // Using raw query to bypass TypeScript type issues with new table
       const { data, error } = await supabase
-        .from('user_datasets')
+        .from('user_datasets' as any)
         .select('*')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
@@ -45,7 +46,7 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
       if (error) throw error;
 
       if (data) {
-        setSavedDatasets(data.map(dataset => ({
+        setSavedDatasets(data.map((dataset: any) => ({
           id: dataset.id,
           name: dataset.dataset_name,
           filename: dataset.filename,
@@ -88,7 +89,7 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
   const handleDeleteDataset = async (datasetId: string) => {
     try {
       const { error } = await supabase
-        .from('user_datasets')
+        .from('user_datasets' as any)
         .delete()
         .eq('id', datasetId)
         .eq('user_id', userId);

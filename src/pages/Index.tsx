@@ -11,6 +11,7 @@ import DashboardHeader from "@/components/layout/DashboardHeader";
 import { Database, Upload, Settings, Brain, BarChart3, Loader2, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import DataSelector from "@/components/data/DataSelector";
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,6 +22,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [mlResults, setMlResults] = useState<any[]>([]);
+  const [showDataSelector, setShowDataSelector] = useState(false);
   const { toast } = useToast();
   
   // AutoML state that persists across tab switches
@@ -40,7 +42,7 @@ const Index = () => {
   console.log("ML Results:", mlResults);
 
   // Handle data upload with proper state clearing
-  const handleDataUploaded = useCallback((data: any) => {
+  const handleDataUploaded = useCallback(async (data: any) => {
     console.log("New data uploaded, clearing previous states");
     
     // Clear all previous data states
@@ -55,10 +57,42 @@ const Index = () => {
       modelResults: null,
       showInsights: false
     });
+
+    // Save to user_datasets table
+    if (userId && data) {
+      try {
+        const datasetName = data.filename || `Dataset ${new Date().toLocaleDateString()}`;
+        const { error } = await supabase
+          .from('user_datasets' as any)
+          .insert({
+            user_id: userId,
+            dataset_name: datasetName,
+            filename: data.filename || 'unknown',
+            uploaded_data: data,
+            cleaned_data: null
+          });
+
+        if (error) {
+          console.error("Error saving dataset:", error);
+          toast({
+            title: "Save Warning",
+            description: "Dataset uploaded but couldn't be saved to your account.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Dataset Saved",
+            description: `${datasetName} has been saved to your account.`,
+          });
+        }
+      } catch (error) {
+        console.error("Error saving dataset:", error);
+      }
+    }
     
     // Switch to preview tab to show the new data
     setActiveTab("preview");
-  }, []);
+  }, [userId, toast]);
 
   // Handle data clearing
   const handleDataCleared = useCallback(() => {
@@ -435,6 +469,14 @@ const Index = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <Button
+                onClick={() => setShowDataSelector(!showDataSelector)}
+                variant="outline"
+                className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white"
+              >
+                <Database className="h-4 w-4 mr-2" />
+                {showDataSelector ? 'Hide' : 'Show'} Saved Data
+              </Button>
               {isSaving && (
                 <div className="flex items-center gap-2 text-purple-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -450,6 +492,16 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {showDataSelector && userId && (
+          <div className="mb-6">
+            <DataSelector
+              userId={userId}
+              onDataSelected={handleDataSelected}
+              currentData={uploadedData}
+            />
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-4 bg-slate-800 border-slate-700">
