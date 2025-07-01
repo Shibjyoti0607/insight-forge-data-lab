@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Database, Trash2, Calendar, FileText } from "lucide-react";
+import { Database, Trash2, Calendar, FileText, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,23 +30,33 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  console.log("DataSelector - userId:", userId);
+  console.log("DataSelector - savedDatasets:", savedDatasets);
+
   // Fetch all saved datasets for the user
   const fetchSavedDatasets = async () => {
     if (!userId) return;
 
     try {
       setIsLoading(true);
-      // Using raw query to bypass TypeScript type issues with new table
+      console.log("Fetching datasets for user:", userId);
+      
       const { data, error } = await supabase
-        .from('user_datasets' as any)
+        .from('user_datasets')
         .select('*')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      console.log("Fetch result - data:", data);
+      console.log("Fetch result - error:", error);
+
+      if (error) {
+        console.error("Error fetching datasets:", error);
+        throw error;
+      }
 
       if (data) {
-        setSavedDatasets(data.map((dataset: any) => ({
+        const datasets = data.map((dataset: any) => ({
           id: dataset.id,
           name: dataset.dataset_name,
           filename: dataset.filename,
@@ -54,13 +64,23 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
           cleanedData: dataset.cleaned_data,
           createdAt: dataset.created_at,
           updatedAt: dataset.updated_at
-        })));
+        }));
+        
+        console.log("Mapped datasets:", datasets);
+        setSavedDatasets(datasets);
+        
+        if (datasets.length > 0) {
+          toast({
+            title: "Datasets Loaded",
+            description: `Found ${datasets.length} saved dataset(s).`,
+          });
+        }
       }
     } catch (error: any) {
       console.error("Error fetching saved datasets:", error);
       toast({
         title: "Error",
-        description: "Failed to load your saved datasets.",
+        description: "Failed to load your saved datasets. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -71,6 +91,8 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
   // Load selected dataset
   const handleDatasetSelect = (datasetId: string) => {
     const dataset = savedDatasets.find(d => d.id === datasetId);
+    console.log("Selected dataset:", dataset);
+    
     if (dataset) {
       setSelectedDatasetId(datasetId);
       onDataSelected({
@@ -89,7 +111,7 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
   const handleDeleteDataset = async (datasetId: string) => {
     try {
       const { error } = await supabase
-        .from('user_datasets' as any)
+        .from('user_datasets')
         .delete()
         .eq('id', datasetId)
         .eq('user_id', userId);
@@ -124,19 +146,36 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
   return (
     <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-white flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          Select Dataset
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            <CardTitle className="text-white">Select Dataset</CardTitle>
+          </div>
+          <Button
+            onClick={fetchSavedDatasets}
+            size="sm"
+            variant="outline"
+            className="border-slate-600 text-slate-400 hover:bg-slate-700"
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
         <CardDescription className="text-gray-400">
           Choose from your saved datasets or upload a new one
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {savedDatasets.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-4">
+            <RefreshCw className="h-6 w-6 animate-spin text-purple-400 mx-auto mb-2" />
+            <p className="text-gray-400">Loading datasets...</p>
+          </div>
+        ) : savedDatasets.length > 0 ? (
           <>
             <div className="space-y-2">
-              <label className="text-sm text-gray-400">Available Datasets</label>
+              <label className="text-sm text-gray-400">Available Datasets ({savedDatasets.length})</label>
               <Select value={selectedDatasetId} onValueChange={handleDatasetSelect}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Select a dataset" />
@@ -149,7 +188,7 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
                           <FileText className="h-4 w-4" />
                           <span>{dataset.name}</span>
                         </div>
-                        <Badge variant="outline" className="text-xs border-slate-500 text-slate-400">
+                        <Badge variant="outline" className="text-xs border-slate-500 text-slate-400 ml-2">
                           {new Date(dataset.updatedAt).toLocaleDateString()}
                         </Badge>
                       </div>
@@ -201,12 +240,15 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
             <Database className="h-12 w-12 text-gray-500 mx-auto mb-4" />
             <p className="text-gray-400 mb-2">No saved datasets found</p>
             <p className="text-sm text-gray-500">Upload your first dataset to get started</p>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="text-center py-4">
-            <p className="text-gray-400">Loading datasets...</p>
+            <Button
+              onClick={fetchSavedDatasets}
+              size="sm"
+              variant="outline"
+              className="border-slate-600 text-slate-400 hover:bg-slate-700 mt-4"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry Loading
+            </Button>
           </div>
         )}
       </CardContent>
