@@ -105,9 +105,17 @@ const Index = () => {
     // Save to user_datasets table
     if (userId && data) {
       try {
+        setIsSaving(true);
         const datasetName = data.filename || `Dataset ${new Date().toLocaleDateString()}`;
+        
+        console.log("Attempting to save dataset:", {
+          user_id: userId,
+          dataset_name: datasetName,
+          filename: data.filename || 'unknown'
+        });
+
         const { data: newDataset, error } = await supabase
-          .from('user_datasets' as any)
+          .from('user_datasets')
           .insert({
             user_id: userId,
             dataset_name: datasetName,
@@ -122,7 +130,7 @@ const Index = () => {
           console.error("Error saving dataset:", error);
           toast({
             title: "Save Warning",
-            description: "Dataset uploaded but couldn't be saved to your account.",
+            description: `Dataset uploaded but couldn't be saved: ${error.message}`,
             variant: "destructive",
           });
         } else {
@@ -133,8 +141,15 @@ const Index = () => {
             description: `${datasetName} has been saved to your account.`,
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving dataset:", error);
+        toast({
+          title: "Save Error",
+          description: `Failed to save dataset: ${error.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
       }
     }
     
@@ -165,6 +180,7 @@ const Index = () => {
     // Update the current dataset with cleaned data if we have a dataset ID
     if (currentDatasetId && userId) {
       try {
+        setIsSaving(true);
         const { error } = await supabase
           .from('user_datasets')
           .update({ cleaned_data: cleanedDataResult })
@@ -173,14 +189,30 @@ const Index = () => {
 
         if (error) {
           console.error("Error updating cleaned data:", error);
+          toast({
+            title: "Save Warning",
+            description: `Cleaned data couldn't be saved: ${error.message}`,
+            variant: "destructive",
+          });
         } else {
           console.log("Cleaned data saved to dataset");
+          toast({
+            title: "Data Cleaned",
+            description: "Cleaned data has been saved to your dataset.",
+          });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving cleaned data:", error);
+        toast({
+          title: "Save Error",
+          description: `Failed to save cleaned data: ${error.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
       }
     }
-  }, [currentDatasetId, userId]);
+  }, [currentDatasetId, userId, toast]);
 
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (userIdToFetch: string) => {
