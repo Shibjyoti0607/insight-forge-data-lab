@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,10 +94,15 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
     
     if (dataset) {
       setSelectedDatasetId(datasetId);
-      onDataSelected({
+      
+      // Create the data object with the dataset ID included
+      const dataToLoad = {
         ...dataset.uploadedData,
+        id: dataset.id, // Include the dataset ID
         cleanedData: dataset.cleanedData
-      });
+      };
+      
+      onDataSelected(dataToLoad);
       
       toast({
         title: "Dataset Loaded",
@@ -229,6 +233,25 @@ const DataSelector = ({ userId, onDataSelected, currentData }: DataSelectorProps
                           {new Date(dataset.updatedAt).toLocaleDateString()}
                         </div>
                       </div>
+                      <div>
+                        <p className="text-gray-400">Rows</p>
+                        <p className="text-white">
+                          {dataset.uploadedData?.statistics?.totalRows || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Columns</p>
+                        <p className="text-white">
+                          {dataset.uploadedData?.statistics?.totalColumns || 'N/A'}
+                        </p>
+                      </div>
+                      {dataset.cleanedData && (
+                        <div className="col-span-2">
+                          <Badge className="bg-green-600 text-white">
+                            Cleaned Data Available
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
