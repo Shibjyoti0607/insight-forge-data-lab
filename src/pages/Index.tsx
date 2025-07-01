@@ -19,6 +19,7 @@ const Index = () => {
   const [cleanedData, setCleanedData] = useState(null);
   const [activeTab, setActiveTab] = useState("upload");
   const [userId, setUserId] = useState<string | null>(null);
+  const [currentDatasetId, setCurrentDatasetId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [mlResults, setMlResults] = useState<any[]>([]);
@@ -37,6 +38,7 @@ const Index = () => {
   console.log("Index component rendered");
   console.log("Is authenticated:", isAuthenticated);
   console.log("User ID:", userId);
+  console.log("Current Dataset ID:", currentDatasetId);
   console.log("Uploaded data:", uploadedData ? "Present" : "None");
   console.log("AutoML state:", autoMLState);
   console.log("ML Results:", mlResults);
@@ -54,6 +56,11 @@ const Index = () => {
         setCleanedData(data.cleanedData);
       } else {
         setCleanedData(null);
+      }
+      
+      // Set the current dataset ID if available
+      if (data.id) {
+        setCurrentDatasetId(data.id);
       }
       
       // Reset AutoML state for new data
@@ -99,7 +106,7 @@ const Index = () => {
     if (userId && data) {
       try {
         const datasetName = data.filename || `Dataset ${new Date().toLocaleDateString()}`;
-        const { error } = await supabase
+        const { data: newDataset, error } = await supabase
           .from('user_datasets' as any)
           .insert({
             user_id: userId,
@@ -107,7 +114,9 @@ const Index = () => {
             filename: data.filename || 'unknown',
             uploaded_data: data,
             cleaned_data: null
-          });
+          })
+          .select()
+          .single();
 
         if (error) {
           console.error("Error saving dataset:", error);
@@ -117,6 +126,8 @@ const Index = () => {
             variant: "destructive",
           });
         } else {
+          console.log("Dataset saved successfully:", newDataset);
+          setCurrentDatasetId(newDataset.id);
           toast({
             title: "Dataset Saved",
             description: `${datasetName} has been saved to your account.`,
@@ -136,6 +147,7 @@ const Index = () => {
     console.log("Clearing all data states");
     setUploadedData(null);
     setCleanedData(null);
+    setCurrentDatasetId(null);
     setAutoMLState({
       selectedTarget: "",
       selectedTask: "",
@@ -146,10 +158,29 @@ const Index = () => {
   }, []);
 
   // Handle cleaned data update
-  const handleDataCleaned = useCallback((cleanedDataResult: any) => {
+  const handleDataCleaned = useCallback(async (cleanedDataResult: any) => {
     console.log("Data cleaned, updating state");
     setCleanedData(cleanedDataResult);
-  }, []);
+    
+    // Update the current dataset with cleaned data if we have a dataset ID
+    if (currentDatasetId && userId) {
+      try {
+        const { error } = await supabase
+          .from('user_datasets')
+          .update({ cleaned_data: cleanedDataResult })
+          .eq('id', currentDatasetId)
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error("Error updating cleaned data:", error);
+        } else {
+          console.log("Cleaned data saved to dataset");
+        }
+      } catch (error) {
+        console.error("Error saving cleaned data:", error);
+      }
+    }
+  }, [currentDatasetId, userId]);
 
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (userIdToFetch: string) => {
@@ -157,34 +188,54 @@ const Index = () => {
 
     try {
       console.log("Fetching user data for:", userIdToFetch);
-      const { data, error } = await supabase
+      
+      // First, get the current dataset ID from user_data
+      const { data: userData, error: userError } = await supabase
         .from('user_data')
-        .select('uploaded_data, cleaned_data')
+        .select('current_dataset_id')
         .eq('id', userIdToFetch)
         .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (userError) {
+        throw userError;
       }
 
-      if (data) {
-        console.log("User data fetched successfully");
-        if (data.uploaded_data) {
-          setUploadedData(data.uploaded_data as any);
-          console.log("Restored uploaded data");
-        }
-        if (data.cleaned_data) {
-          setCleanedData(data.cleaned_data as any);
-          console.log("Restored cleaned data");
-        }
+      if (userData?.current_dataset_id) {
+        console.log("Found current dataset ID:", userData.current_dataset_id);
+        setCurrentDatasetId(userData.current_dataset_id);
         
-        // If we have data, switch to preview tab
-        if (data.uploaded_data) {
-          setActiveTab("preview");
+        // Fetch the actual dataset data
+        const { data: datasetData, error: datasetError } = await supabase
+          .from('user_datasets')
+          .select('uploaded_data, cleaned_data')
+          .eq('id', userData.current_dataset_id)
+          .eq('user_id', userIdToFetch)
+          .single();
+
+        if (datasetError) {
+          console.error("Error fetching dataset data:", datasetError);
+          return;
+        }
+
+        if (datasetData) {
+          console.log("Dataset data fetched successfully");
+          if (datasetData.uploaded_data) {
+            setUploadedData(datasetData.uploaded_data as any);
+            console.log("Restored uploaded data");
+          }
+          if (datasetData.cleaned_data) {
+            setCleanedData(datasetData.cleaned_data as any);
+            console.log("Restored cleaned data");
+          }
+          
+          // If we have data, switch to preview tab
+          if (datasetData.uploaded_data) {
+            setActiveTab("preview");
+          }
         }
       } else {
-        // No data found - this is normal for new users
-        console.log("No existing data found for user");
+        // No current dataset found - this is normal for new users
+        console.log("No current dataset found for user");
       }
     } catch (error: any) {
       console.error("Error fetching user data:", error);
@@ -298,20 +349,19 @@ const Index = () => {
     }
   }, [toast]);
 
-  // Save user data to Supabase
-  const saveUserData = useCallback(async (userIdToSave: string, uploadedDataToSave: any, cleanedDataToSave: any) => {
+  // Save user data to Supabase (now only saves current dataset reference)
+  const saveUserData = useCallback(async (userIdToSave: string, datasetIdToSave: string | null) => {
     if (!userIdToSave) return;
 
     try {
       setIsSaving(true);
-      console.log("Saving user data for:", userIdToSave);
+      console.log("Saving user data for:", userIdToSave, "with dataset ID:", datasetIdToSave);
       
       const { error } = await supabase
         .from('user_data')
         .upsert({
           id: userIdToSave,
-          uploaded_data: uploadedDataToSave,
-          cleaned_data: cleanedDataToSave,
+          current_dataset_id: datasetIdToSave,
         }, {
           onConflict: 'id'
         });
@@ -323,7 +373,7 @@ const Index = () => {
       console.error("Error saving user data:", error);
       toast({
         title: "Save Error",
-        description: "Failed to save your data. Your work may be lost if you refresh the page.",
+        description: "Failed to save your data reference. Your work may be lost if you refresh the page.",
         variant: "destructive",
       });
     } finally {
@@ -361,17 +411,17 @@ const Index = () => {
     checkSession();
   }, [fetchUserData, fetchMLResults]);
 
-  // Save data whenever uploadedData or cleanedData changes
+  // Save current dataset reference whenever currentDatasetId changes
   useEffect(() => {
-    if (userId && (uploadedData || cleanedData)) {
+    if (userId) {
       // Debounce the save operation to avoid too many requests
       const timeoutId = setTimeout(() => {
-        saveUserData(userId, uploadedData, cleanedData);
+        saveUserData(userId, currentDatasetId);
       }, 1000);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [userId, uploadedData, cleanedData, saveUserData]);
+  }, [userId, currentDatasetId, saveUserData]);
 
   // Handle successful authentication
   const handleAuthSuccess = async () => {
@@ -411,6 +461,7 @@ const Index = () => {
       setUserId(null);
       setUploadedData(null);
       setCleanedData(null);
+      setCurrentDatasetId(null);
       setMlResults([]);
       setActiveTab("upload");
       setAutoMLState({
