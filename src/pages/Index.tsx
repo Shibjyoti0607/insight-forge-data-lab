@@ -41,6 +41,43 @@ const Index = () => {
   console.log("AutoML state:", autoMLState);
   console.log("ML Results:", mlResults);
 
+  // Handle data selection from DataSelector
+  const handleDataSelected = useCallback((data: any) => {
+    console.log("Data selected from DataSelector:", data);
+    
+    if (data) {
+      // Set the uploaded data
+      setUploadedData(data);
+      
+      // If the selected data has cleaned data, set it as well
+      if (data.cleanedData) {
+        setCleanedData(data.cleanedData);
+      } else {
+        setCleanedData(null);
+      }
+      
+      // Reset AutoML state for new data
+      setAutoMLState({
+        selectedTarget: "",
+        selectedTask: "",
+        isTraining: false,
+        modelResults: null,
+        showInsights: false
+      });
+
+      // Switch to preview tab to show the selected data
+      setActiveTab("preview");
+      
+      toast({
+        title: "Dataset Selected",
+        description: "Dataset loaded successfully.",
+      });
+    } else {
+      // Clear all data if null is passed
+      handleDataCleared();
+    }
+  }, [toast]);
+
   // Handle data upload with proper state clearing
   const handleDataUploaded = useCallback(async (data: any) => {
     console.log("New data uploaded, clearing previous states");
